@@ -171,6 +171,7 @@
 </style>
 <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -383,7 +384,7 @@
         <div class="divider"></div>
         <div class="export-row">
           <button class="btn primary" id="exportOne">Exportar este slide</button>
-          <button class="btn" id="exportAll">Exportar carrossel (<span id="exportCount">5</span> itens)</button>
+          <button class="btn" id="exportAll">Exportar carrossel em .zip (<span id="exportCount">5</span> itens)</button>
           <span class="export-note" id="exportNote">PNG · 1080 × 1350</span>
           <span class="export-note" id="exportProgress"></span>
         </div>
@@ -1441,14 +1442,13 @@
     const mp4Blob = await convertWebmToMp4(webmBlob);
     setExportProgress("");
     const filename = slug($("projectName").value) + "-" + String(index+1).padStart(2,"0") + ".mp4";
-    downloadBlob(filename, mp4Blob);
+    return { filename, blob: mp4Blob };
   }
 
   async function exportSlideAt(index){
     const s = state.slides[index];
     if (s.bg.type === "video"){
-      await exportVideoSlideAt(index);
-      return;
+      return await exportVideoSlideAt(index);
     }
     const [W,H] = dims();
     exportCanvas.width = W; exportCanvas.height = H;
@@ -1456,13 +1456,14 @@
     drawSlide(ctx, s, state.brand, W, H, index, state.slides.length);
     const blob = await new Promise(res => exportCanvas.toBlob(res, "image/png"));
     const filename = slug($("projectName").value) + "-" + String(index+1).padStart(2,"0") + ".png";
-    downloadBlob(filename, blob);
+    return { filename, blob };
   }
 
   $("exportOne").addEventListener("click", async () => {
     $("exportOne").disabled = true; $("exportAll").disabled = true;
     try {
-      await exportSlideAt(selectedIndex());
+      const { filename, blob } = await exportSlideAt(selectedIndex());
+      downloadBlob(filename, blob);
       toastMsg("Slide exportado");
     } catch(err){
       toastMsg("Não foi possível exportar: " + (err && err.message ? err.message : "erro"));
@@ -1473,11 +1474,18 @@
   });
 
   $("exportAll").addEventListener("click", async () => {
+    if (!window.JSZip){
+      toastMsg("Não foi possível montar o zip (biblioteca não carregou)");
+      return;
+    }
     $("exportOne").disabled = true; $("exportAll").disabled = true;
+    const zip = new JSZip();
     let ok = 0;
     for (let i=0;i<state.slides.length;i++){
       try {
-        await exportSlideAt(i);
+        setExportProgress("Exportando slide " + (i+1) + " de " + state.slides.length + "…");
+        const { filename, blob } = await exportSlideAt(i);
+        zip.file(filename, blob);
         ok++;
         await new Promise(r => setTimeout(r, 200));
       } catch(err){
@@ -1485,7 +1493,13 @@
         break;
       }
     }
-    if (ok === state.slides.length) toastMsg("Carrossel exportado (" + ok + " itens)");
+    if (ok === state.slides.length){
+      setExportProgress("Compactando arquivos…");
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const zipName = slug($("projectName").value) + ".zip";
+      downloadBlob(zipName, zipBlob);
+      toastMsg("Carrossel exportado (" + ok + " itens em " + zipName + ")");
+    }
     setExportProgress("");
     $("exportOne").disabled = false; $("exportAll").disabled = false;
   });

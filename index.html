@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>PostSBR v.2</title>
+<script>
+(function(){
+  try {
+    var t = localStorage.getItem("mesa-de-carrossel:theme");
+    if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+  } catch(e){}
+})();
+</script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,900;100,400&family=Instrument+Serif:ital@1&display=swap">
 <style>
   :root{
@@ -56,8 +64,24 @@
 
   .header{ position:relative; display:flex; align-items:flex-end; justify-content:space-between; gap:24px;
     margin-bottom:26px; padding-bottom:20px; padding-right:150px; border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  .brand-row{ display:flex; align-items:center; gap:10px; }
   .brand-title{ font-family:'Geist',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.01em; margin:0; }
   .brand-title .beta-tag{ color:#4c00ff; font-size:13px; font-weight:600; letter-spacing:0.02em; vertical-align:middle; }
+  .theme-toggle{ display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px;
+    border:1px solid var(--line); border-radius:50%; background:var(--paper-2); color:var(--ink-soft);
+    cursor:pointer; flex-shrink:0; padding:0; }
+  .theme-toggle:hover{ border-color:var(--accent); color:var(--accent); }
+  .theme-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .theme-toggle svg{ width:15px; height:15px; display:block; }
+  .theme-toggle .icon-sun{ display:none; }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]) .theme-toggle .icon-moon{ display:none; }
+    :root:not([data-theme="light"]) .theme-toggle .icon-sun{ display:block; }
+  }
+  :root[data-theme="dark"] .theme-toggle .icon-moon{ display:none; }
+  :root[data-theme="dark"] .theme-toggle .icon-sun{ display:block; }
+  :root[data-theme="light"] .theme-toggle .icon-moon{ display:block; }
+  :root[data-theme="light"] .theme-toggle .icon-sun{ display:none; }
   .subtitle{ color:var(--ink-soft); font-size:13.5px; margin-top:5px; max-width:46ch; }
   .header-controls{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
   .new-carrossel-btn{ position:absolute; top:0; right:0; }
@@ -177,8 +201,12 @@
 
 <div class="app">
   <header class="header">
-    <div>
+    <div class="brand-row">
       <h1 class="brand-title">PostSBR <span class="beta-tag">v.2</span></h1>
+      <button class="theme-toggle" id="themeToggle" type="button" title="Alternar modo claro/escuro" aria-label="Alternar modo claro/escuro">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
     </div>
     <div class="header-controls">
       <div class="field">
@@ -413,7 +441,19 @@
   const uid = () => Math.random().toString(36).slice(2,9);
   const STORAGE_KEY = "mesa-de-carrossel:draft:v1";
   const SERVER_URL_KEY = "mesa-de-carrossel:serverUrl";
+  const THEME_KEY = "mesa-de-carrossel:theme";
   const MIN_SLIDES = 2, MAX_SLIDES = 20;
+
+  function currentTheme(){
+    const attr = document.documentElement.getAttribute("data-theme");
+    if (attr === "light" || attr === "dark") return attr;
+    return (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  document.getElementById("themeToggle").addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch(e){}
+  });
 
   function getServerUrl(){
     try { return (localStorage.getItem(SERVER_URL_KEY) || "").trim().replace(/\/+$/, ""); }

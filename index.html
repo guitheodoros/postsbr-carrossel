@@ -67,21 +67,21 @@
   .brand-row{ display:flex; align-items:center; gap:10px; }
   .brand-title{ font-family:'Geist',sans-serif; font-weight:700; font-size:28px; letter-spacing:-0.01em; margin:0; }
   .brand-title .beta-tag{ color:#4c00ff; font-size:13px; font-weight:600; letter-spacing:0.02em; vertical-align:middle; }
-  .theme-toggle{ position:relative; display:inline-flex; align-items:center; width:46px; height:25px;
+  .theme-toggle{ position:relative; display:inline-flex; align-items:center; width:53px; height:18px;
     border:1px solid var(--line); border-radius:999px; background:var(--paper-2); cursor:pointer;
     flex-shrink:0; padding:0; }
   .theme-toggle:hover{ border-color:var(--accent); }
   .theme-toggle:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
-  .theme-toggle .track-icon{ position:absolute; top:50%; transform:translateY(-50%); width:13px; height:13px;
+  .theme-toggle .track-icon{ position:absolute; top:50%; transform:translateY(-50%); width:10px; height:10px;
     color:var(--ink-soft); pointer-events:none; }
-  .theme-toggle .icon-sun{ left:6px; }
-  .theme-toggle .icon-moon{ right:6px; }
-  .theme-toggle .theme-thumb{ position:absolute; top:2px; left:2px; width:19px; height:19px; border-radius:50%;
+  .theme-toggle .icon-sun{ left:4px; }
+  .theme-toggle .icon-moon{ right:4px; }
+  .theme-toggle .theme-thumb{ position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%;
     background:var(--ink); box-shadow:var(--shadow); transition:transform .18s ease, background .18s ease; }
   @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]) .theme-toggle .theme-thumb{ transform:translateX(21px); background:var(--accent); }
+    :root:not([data-theme="light"]) .theme-toggle .theme-thumb{ transform:translateX(35px); background:var(--accent); }
   }
-  :root[data-theme="dark"] .theme-toggle .theme-thumb{ transform:translateX(21px); background:var(--accent); }
+  :root[data-theme="dark"] .theme-toggle .theme-thumb{ transform:translateX(35px); background:var(--accent); }
   :root[data-theme="light"] .theme-toggle .theme-thumb{ transform:translateX(0); background:var(--ink); }
   .subtitle{ color:var(--ink-soft); font-size:13.5px; margin-top:5px; max-width:46ch; }
   .header-controls{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }

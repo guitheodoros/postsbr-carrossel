@@ -400,10 +400,14 @@
           </div>
         </div>
         <div class="field" id="cropField" style="display:none">
-          <label>Recorte do fundo</label>
+          <label for="bgZoom">Zoom do fundo</label>
           <div style="display:flex; align-items:center; gap:8px;">
-            <span class="export-note">arraste o fundo no preview</span>
-            <button class="btn" id="resetCrop" type="button" style="padding:6px 10px; font-size:11px;">centralizar</button>
+            <input type="range" id="bgZoom" min="100" max="300" step="1" value="100" style="flex:1;">
+            <span class="export-note" id="bgZoomValue" style="min-width:34px;">100%</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+            <span class="export-note">arraste o fundo no preview para reposicionar</span>
+            <button class="btn" id="resetCrop" type="button" style="padding:6px 10px; font-size:11px;">redefinir</button>
           </div>
         </div>
         <div class="field">
@@ -518,7 +522,7 @@
       valign: "center",
       halign: "left",
       textColor: "#ffffff",
-      bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5,
+      bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
         videoUrl:null, videoEl:null, videoName:null }
     }, opts);
   }
@@ -567,7 +571,7 @@
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor,
-        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY }
+        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom }
       }))
     };
   }
@@ -601,7 +605,7 @@
       let hadVideo = false;
       parsed.slides = parsed.slides.map(raw => {
         const s = slide(raw);
-        s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5,
+        s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
           videoUrl:null, videoEl:null, videoName:null }, raw.bg);
         if (s.bg.type === "image" && s.bg.image){
           const img = new Image();
@@ -714,7 +718,8 @@
       if (mediaReady){
         const iw = isVideo ? media.videoWidth : media.naturalWidth;
         const ih = isVideo ? media.videoHeight : media.naturalHeight;
-        const scale = Math.max(W/iw, H/ih);
+        const zoom = s.bg.zoom != null ? s.bg.zoom : 1;
+        const scale = Math.max(W/iw, H/ih) * zoom;
         const dw = iw*scale, dh = ih*scale;
         const cropX = s.bg.cropX != null ? s.bg.cropX : 0.5;
         const cropY = s.bg.cropY != null ? s.bg.cropY : 0.5;
@@ -1083,6 +1088,9 @@
     const overlay = s.bg.imageOverlay != null ? s.bg.imageOverlay : 40;
     $("bgOverlay").value = overlay;
     $("overlayValue").textContent = overlay + "%";
+    const zoomPct = Math.round((s.bg.zoom != null ? s.bg.zoom : 1) * 100);
+    $("bgZoom").value = zoomPct;
+    $("bgZoomValue").textContent = zoomPct + "%";
     updateCropAffordance(s);
     syncVideoPlayback();
     updateExportLabels();
@@ -1155,9 +1163,18 @@
     $("overlayValue").textContent = e.target.value + "%";
     scheduleRender();
   });
+  bindField("bgZoom","input", e => {
+    const s = selectedSlide();
+    s.bg.zoom = Number(e.target.value) / 100;
+    $("bgZoomValue").textContent = e.target.value + "%";
+    updateCropAffordance(s);
+    scheduleRender();
+  });
   $("resetCrop").addEventListener("click", () => {
     const s = selectedSlide();
-    s.bg.cropX = 0.5; s.bg.cropY = 0.5;
+    s.bg.cropX = 0.5; s.bg.cropY = 0.5; s.bg.zoom = 1;
+    $("bgZoom").value = 100;
+    $("bgZoomValue").textContent = "100%";
     scheduleRender(); scheduleSave();
   });
 
@@ -1200,7 +1217,8 @@
     cropDrag.lastX = e.clientX; cropDrag.lastY = e.clientY;
     const [W,H] = dims();
     const [iw, ih] = size;
-    const mediaScale = Math.max(W/iw, H/ih);
+    const zoom = s.bg.zoom != null ? s.bg.zoom : 1;
+    const mediaScale = Math.max(W/iw, H/ih) * zoom;
     const dw = iw*mediaScale, dh = ih*mediaScale;
     const overflowX = dw - W, overflowY = dh - H;
     const dxCanvas = dxClient * cropDrag.scale, dyCanvas = dyClient * cropDrag.scale;

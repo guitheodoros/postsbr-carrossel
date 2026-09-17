@@ -123,6 +123,17 @@
   .thumb-controls button{ background:none; border:none; color:var(--ink-soft); font-size:12px; cursor:pointer; padding:2px 3px; font-family:'IBM Plex Mono'; }
   .thumb-controls button:hover:not(:disabled){ color:var(--ink); }
   .thumb-controls button:disabled{ opacity:.3; cursor:not-allowed; }
+
+  .media-pool{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+  .media-pool:empty{ display:none; }
+  .media-pool-item{ position:relative; width:56px; height:56px; border-radius:5px; overflow:hidden;
+    border:1.5px solid var(--line); cursor:pointer; flex-shrink:0; background:var(--paper-2); }
+  .media-pool-item.active{ border-color:var(--accent); }
+  .media-pool-item img{ display:block; width:100%; height:100%; object-fit:cover; }
+  .media-pool-item button{ position:absolute; top:1px; right:1px; width:16px; height:16px; line-height:14px;
+    border:none; border-radius:3px; background:rgba(23,22,27,0.7); color:#fff; font-size:11px; cursor:pointer;
+    padding:0; opacity:0; transition:opacity .15s; }
+  .media-pool-item:hover button{ opacity:1; }
   .thumb-index{ position:absolute; top:8px; left:8px; font-family:'IBM Plex Mono'; font-size:10px;
     background:rgba(0,0,0,.6); color:#fff; padding:1px 5px; border-radius:3px; letter-spacing:.02em; }
   .add-slide{ border:1.5px dashed var(--line); border-radius:7px; padding:13px 18px; text-align:center; font-size:12.5px;
@@ -381,9 +392,10 @@
           </div>
         </div>
         <div class="field" id="imageField" style="display:none">
-          <label for="bgImage">Carregar imagem</label>
+          <label for="bgImage">Carregar imagem(ns)</label>
           <input type="text" id="bgImageName" readonly placeholder="Nenhuma imagem" style="display:none">
-          <input type="file" id="bgImage" accept="image/*">
+          <input type="file" id="bgImage" accept="image/*" multiple>
+          <div class="media-pool" id="mediaPool"></div>
         </div>
         <div class="field" id="videoField" style="display:none">
           <label for="bgVideo">Carregar vídeo</label>
@@ -452,6 +464,74 @@
   const SERVER_URL_KEY = "mesa-de-carrossel:serverUrl";
   const THEME_KEY = "mesa-de-carrossel:theme";
   const MIN_SLIDES = 2, MAX_SLIDES = 20;
+
+  // ---- IndexedDB key-value store (draft storage — much higher quota than localStorage) ----
+  const IDB_NAME = "mesa-de-carrossel";
+  const IDB_STORE = "kv";
+  function idbOpen(){
+    return new Promise((resolve, reject) => {
+      if (!window.indexedDB) { reject(new Error("IndexedDB indisponível")); return; }
+      const req = indexedDB.open(IDB_NAME, 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbGet(key){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readonly");
+      const req = tx.objectStore(IDB_STORE).get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
+  async function idbSet(key, value){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).put(value, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+  async function idbDelete(key){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      tx.objectStore(IDB_STORE).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // resizes to the slide's real export resolution and re-encodes as JPEG before it ever touches storage
+  function compressImageFile(file, maxDim, quality){
+    maxDim = maxDim || 1350; quality = quality != null ? quality : 0.82;
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error || new Error("Falha ao ler o arquivo"));
+      reader.onload = () => {
+        const original = new Image();
+        original.onerror = () => reject(new Error("Não foi possível ler a imagem"));
+        original.onload = () => {
+          const scale = Math.min(1, maxDim / Math.max(original.width, original.height));
+          const w = Math.max(1, Math.round(original.width * scale));
+          const h = Math.max(1, Math.round(original.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          canvas.getContext("2d").drawImage(original, 0, 0, w, h);
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          const compressed = new Image();
+          compressed.onload = () => resolve({ dataUrl, img: compressed });
+          compressed.onerror = () => reject(new Error("Falha ao gerar a versão comprimida"));
+          compressed.src = dataUrl;
+        };
+        original.src = reader.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  }
 
   function currentTheme(){
     const attr = document.documentElement.getAttribute("data-theme");
@@ -527,7 +607,7 @@
       textColor: "#ffffff",
       showLogo: true,
       bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
-        videoUrl:null, videoEl:null, videoName:null }
+        videoUrl:null, videoEl:null, videoName:null, poolId:null }
     }, opts);
   }
 
@@ -536,6 +616,7 @@
     brand: { handle:"@suamarca", accent:"#ff4b2e", showHandle:true, showPageNum:true,
       showLogo:true, logoPos:"left", logo:{ mode:"auto", imgs:{ preto:null, branco:null } } },
     selectedId: null,
+    mediaPool: [], // { id, name, dataUrl, img } — imagens carregadas em lote, atribuídas por slide
     slides: [
       slide({ eyebrow:"salve para depois", headline:"5 erros que fazem seu carrossel ser ignorado",
         body:"E o que fazer em vez disso.", valign:"center", halign:"left", textColor:"#ffffff",
@@ -571,11 +652,12 @@
         showLogo: state.brand.showLogo, logoPos: state.brand.logoPos,
         logoMode: state.brand.logo.mode },
       selectedId: state.selectedId,
+      mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
-        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom }
+        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, poolId: s.bg.poolId || null }
       }))
     };
   }
@@ -586,9 +668,9 @@
     saveTimer = setTimeout(saveDraft, 500);
   }
 
-  function saveDraft(){
+  async function saveDraft(){
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializableState()));
+      await idbSet(STORAGE_KEY, serializableState());
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(now.getMinutes()).padStart(2,"0");
       $("saveStatus").textContent = "salvo às " + hh + ":" + mm;
@@ -599,41 +681,59 @@
     }
   }
 
-  function loadDraft(){
+  // one-time migration for drafts saved before the switch to IndexedDB
+  function migrateLegacyLocalStorageDraft(){
     let raw;
     try { raw = localStorage.getItem(STORAGE_KEY); } catch(e){ return null; }
     if (!raw) return null;
     try {
       const parsed = JSON.parse(raw);
-      if (!parsed || !Array.isArray(parsed.slides) || parsed.slides.length === 0) return null;
-      let hadVideo = false;
-      parsed.slides = parsed.slides.map(raw => {
-        const s = slide(raw);
-        s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
-          videoUrl:null, videoEl:null, videoName:null }, raw.bg);
-        if (s.bg.type === "image" && s.bg.image){
-          const img = new Image();
-          img.onload = () => scheduleRender();
-          img.src = s.bg.image;
-          s.bg.img = img;
-        } else {
-          s.bg.img = null;
-        }
-        if (s.bg.type === "video"){
-          // video files aren't kept in the saved draft (too large for localStorage); needs a re-upload
-          hadVideo = true;
-          s.bg.type = "solid";
-          s.bg.videoUrl = null; s.bg.videoEl = null; s.bg.videoName = null;
-        }
-        return s;
-      });
-      parsed._hadVideo = hadVideo;
+      if (parsed) {
+        idbSet(STORAGE_KEY, parsed).catch(() => {});
+        try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+      }
       return parsed;
     } catch(e){ return null; }
   }
 
-  function clearDraft(){
-    try { localStorage.removeItem(STORAGE_KEY); } catch(e){}
+  async function loadDraft(){
+    let parsed;
+    try { parsed = await idbGet(STORAGE_KEY); } catch(e){ parsed = null; }
+    if (!parsed) parsed = migrateLegacyLocalStorageDraft();
+    if (!parsed || !Array.isArray(parsed.slides) || parsed.slides.length === 0) return null;
+    parsed.mediaPool = (Array.isArray(parsed.mediaPool) ? parsed.mediaPool : []).map(p => {
+      const img = new Image();
+      img.onload = () => scheduleRender();
+      img.src = p.dataUrl;
+      return { id: p.id, name: p.name, dataUrl: p.dataUrl, img };
+    });
+    let hadVideo = false;
+    parsed.slides = parsed.slides.map(raw => {
+      const s = slide(raw);
+      s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
+        videoUrl:null, videoEl:null, videoName:null, poolId:null }, raw.bg);
+      if (s.bg.type === "image" && s.bg.image){
+        const img = new Image();
+        img.onload = () => scheduleRender();
+        img.src = s.bg.image;
+        s.bg.img = img;
+      } else {
+        s.bg.img = null;
+      }
+      if (s.bg.type === "video"){
+        // video files aren't kept in the saved draft (too large to persist); needs a re-upload
+        hadVideo = true;
+        s.bg.type = "solid";
+        s.bg.videoUrl = null; s.bg.videoEl = null; s.bg.videoName = null;
+      }
+      return s;
+    });
+    parsed._hadVideo = hadVideo;
+    return parsed;
+  }
+
+  async function clearDraft(){
+    try { await idbDelete(STORAGE_KEY); } catch(e){}
   }
 
   function confirmDialog(message){
@@ -1100,6 +1200,7 @@
     syncVideoPlayback();
     updateExportLabels();
     buildDots();
+    buildMediaGallery();
   }
 
   function updateCropAffordance(s){
@@ -1162,6 +1263,7 @@
     updateCropAffordance(s);
     syncVideoPlayback();
     updateExportLabels();
+    buildMediaGallery();
     scheduleRender();
   });
   bindField("bgOverlay","input", e => {
@@ -1245,18 +1347,69 @@
   }
   mainCanvas.addEventListener("pointerup", endCropDrag);
   mainCanvas.addEventListener("pointercancel", endCropDrag);
-  bindField("bgImage","change", e => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
+  function buildMediaGallery(){
+    const el = $("mediaPool");
+    if (!el) return;
     const s = selectedSlide();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => { s.bg.img = img; scheduleRender(); };
-      img.src = reader.result;
-      s.bg.image = reader.result;
-    };
-    reader.readAsDataURL(file);
+    el.innerHTML = "";
+    state.mediaPool.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "media-pool-item" + (s.bg.type === "image" && s.bg.poolId === item.id ? " active" : "");
+      div.title = item.name || "";
+      const img = document.createElement("img");
+      img.src = item.dataUrl;
+      img.alt = item.name || "";
+      div.appendChild(img);
+      div.addEventListener("click", () => applyPoolImageToSelectedSlide(item));
+      const rm = document.createElement("button");
+      rm.type = "button"; rm.textContent = "✕"; rm.title = "Remover do banco";
+      rm.addEventListener("click", (ev) => { ev.stopPropagation(); removePoolImage(item.id); });
+      div.appendChild(rm);
+      el.appendChild(div);
+    });
+  }
+
+  function applyPoolImageToSelectedSlide(item){
+    const s = selectedSlide();
+    s.bg.image = item.dataUrl;
+    s.bg.img = item.img;
+    s.bg.poolId = item.id;
+    scheduleRender(); scheduleSave();
+    buildMediaGallery();
+  }
+
+  function removePoolImage(id){
+    state.mediaPool = state.mediaPool.filter(p => p.id !== id);
+    buildMediaGallery();
+    scheduleSave();
+  }
+
+  async function addFilesToPool(fileList){
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+    const results = [];
+    for (const file of files){
+      try {
+        const { dataUrl, img } = await compressImageFile(file);
+        results.push({ id: uid(), name: file.name, dataUrl, img });
+      } catch(e){
+        toastMsg("Não foi possível processar " + file.name);
+      }
+    }
+    if (!results.length) return;
+    state.mediaPool.push(...results);
+    const s = selectedSlide();
+    s.bg.image = results[0].dataUrl;
+    s.bg.img = results[0].img;
+    s.bg.poolId = results[0].id;
+    scheduleRender();
+    buildMediaGallery();
+    scheduleSave();
+  }
+
+  bindField("bgImage","change", e => {
+    addFilesToPool(e.target.files);
+    e.target.value = ""; // permite selecionar os mesmos arquivos de novo depois
   });
   bindField("bgVideo","change", e => {
     const file = e.target.files[0];
@@ -1299,7 +1452,7 @@
   $("resetBtn").addEventListener("click", async () => {
     const ok = await confirmDialog("Isso apaga o rascunho salvo neste navegador e recomeça do exemplo. Continuar?");
     if (!ok) return;
-    clearDraft();
+    await clearDraft();
     location.reload();
   });
 
@@ -1584,6 +1737,7 @@
     state.slides = draft.slides;
     state.selectedId = state.slides.some(s => s.id === draft.selectedId)
       ? draft.selectedId : state.slides[0].id;
+    state.mediaPool = draft.mediaPool || [];
 
     if (draft.projectName) $("projectName").value = draft.projectName;
     $("handleInput").value = state.brand.handle;
@@ -1599,13 +1753,13 @@
     if (draft._hadVideo) toastMsg("Vídeos de fundo não ficam salvos no rascunho — envie de novo onde precisar");
   }
 
-  function init(){
+  async function init(){
     preloadLogos();
     let rawServerUrl = null;
     try { rawServerUrl = localStorage.getItem(SERVER_URL_KEY); } catch(e){}
     if (rawServerUrl != null) $("serverUrlInput").value = rawServerUrl;
     else setServerUrl($("serverUrlInput").value);
-    const draft = loadDraft();
+    const draft = await loadDraft();
     if (draft) applyDraft(draft);
 
     if (document.fonts && document.fonts.ready){

@@ -309,7 +309,10 @@
       <div class="editor-col">
         <div class="editor-head">
           <h3 id="editorTitle">Slide 1</h3>
-          <span class="role-tag" id="roleTag">capa</span>
+          <div style="display:flex; align-items:center; gap:12px;">
+            <span class="check"><input type="checkbox" id="slideShowLogo" checked> logo neste slide</span>
+            <span class="role-tag" id="roleTag">capa</span>
+          </div>
         </div>
 
         <div class="grid2">
@@ -522,6 +525,7 @@
       valign: "center",
       halign: "left",
       textColor: "#ffffff",
+      showLogo: true,
       bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
         videoUrl:null, videoEl:null, videoName:null }
     }, opts);
@@ -570,7 +574,7 @@
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
-        valign: s.valign, halign: s.halign, textColor: s.textColor,
+        valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
         bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom }
       }))
     };
@@ -739,7 +743,7 @@
     // logo (pinned to the top of every slide, text flows below it)
     let contentTop = boxTop;
     let logoImg = null;
-    if (brand.showLogo && brand.logo && brand.logo.mode !== "none"){
+    if (brand.showLogo && s.showLogo !== false && brand.logo && brand.logo.mode !== "none"){
       const variant = brand.logo.mode === "auto" ? (isDarkBg(s) ? "branco" : "preto") : brand.logo.mode;
       logoImg = brand.logo.imgs && brand.logo.imgs[variant];
     }
@@ -1060,6 +1064,7 @@
     const i = selectedIndex();
     $("editorTitle").textContent = "Slide " + (i+1);
     $("roleTag").textContent = roleLabel(i, state.slides.length);
+    $("slideShowLogo").checked = s.showLogo !== false;
     $("valignSel").value = s.valign;
     $("halignSel").value = s.halign;
     $("eyebrowInput").value = s.eyebrow;
@@ -1111,6 +1116,7 @@
   // ---- field bindings ----
   function bindField(id, evt, handler){ $(id).addEventListener(evt, handler); }
 
+  bindField("slideShowLogo","change", e => { selectedSlide().showLogo = e.target.checked; scheduleRender(); });
   bindField("valignSel","change", e => { selectedSlide().valign = e.target.value; scheduleRender(); });
   bindField("halignSel","change", e => { selectedSlide().halign = e.target.value; scheduleRender(); });
   bindField("eyebrowInput","input", e => { selectedSlide().eyebrow = e.target.value; scheduleRender(); });

@@ -464,6 +464,7 @@
   const SERVER_URL_KEY = "mesa-de-carrossel:serverUrl";
   const THEME_KEY = "mesa-de-carrossel:theme";
   const MIN_SLIDES = 2, MAX_SLIDES = 20;
+  const MAX_VIDEO_EXPORT_SECONDS = 60;
 
   // ---- IndexedDB key-value store (draft storage — much higher quota than localStorage) ----
   const IDB_NAME = "mesa-de-carrossel";
@@ -1034,6 +1035,42 @@
     return v;
   }
 
+  // taps the original file's audio via Web Audio (works even though the preview element is muted)
+  // — cached on the element itself because createMediaElementSource can only be called once per element
+  function getVideoAudioStream(videoEl){
+    if (videoEl._audioDest) return videoEl._audioDest.stream;
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      const ctx = new Ctx();
+      const source = ctx.createMediaElementSource(videoEl);
+      const dest = ctx.createMediaStreamDestination();
+      source.connect(dest);
+      ctx.resume().catch(()=>{});
+      videoEl._audioCtx = ctx;
+      videoEl._audioDest = dest;
+      return dest.stream;
+    } catch(e){
+      return null;
+    }
+  }
+
+  function formatDuration(totalSeconds){
+    const s = Math.round(totalSeconds);
+    return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0");
+  }
+
+  function videoStatusLabel(bg){
+    if (!bg.videoName) return "";
+    let label = bg.videoName;
+    if (bg.videoEl && bg.videoEl.duration){
+      label += " · " + formatDuration(bg.videoEl.duration);
+      if (bg.videoEl.duration > MAX_VIDEO_EXPORT_SECONDS){
+        label += " (será cortado em " + formatDuration(MAX_VIDEO_EXPORT_SECONDS) + " na exportação)";
+      }
+    }
+    return label;
+  }
+
   function syncVideoPlayback(){
     const selected = selectedSlide();
     state.slides.forEach(s => {
@@ -1189,7 +1226,7 @@
     $("overlayField").style.display = (isImage || isVideo) ? "flex" : "none";
     $("cropField").style.display = (isImage || isVideo) ? "flex" : "none";
     $("color1Field").style.display = (isImage || isVideo) ? "none" : "flex";
-    $("videoStatus").textContent = s.bg.videoName ? s.bg.videoName : "";
+    $("videoStatus").textContent = videoStatusLabel(s.bg);
     const overlay = s.bg.imageOverlay != null ? s.bg.imageOverlay : 40;
     $("bgOverlay").value = overlay;
     $("overlayValue").textContent = overlay + "%";
@@ -1421,7 +1458,10 @@
     s.bg.videoUrl = url;
     s.bg.videoName = file.name;
     s.bg.videoEl = createVideoElement(url);
-    s.bg.videoEl.addEventListener("loadedmetadata", () => scheduleRender());
+    s.bg.videoEl.addEventListener("loadedmetadata", () => {
+      $("videoStatus").textContent = videoStatusLabel(s.bg);
+      scheduleRender();
+    });
     $("videoStatus").textContent = file.name;
     scheduleRender(); scheduleSave();
   });
@@ -1585,7 +1625,11 @@
     videoEl.currentTime = 0;
     await new Promise(res => { videoEl.onseeked = res; });
 
-    const stream = exportCanvas.captureStream(30);
+    const canvasStream = exportCanvas.captureStream(30);
+    const audioStream = getVideoAudioStream(videoEl);
+    const tracks = canvasStream.getVideoTracks().slice();
+    if (audioStream) tracks.push(...audioStream.getAudioTracks());
+    const stream = new MediaStream(tracks);
     const mime = pickWebmMime();
     if (!mime) throw new Error("Este navegador não sabe gravar vídeo");
     const recorder = new MediaRecorder(stream, { mimeType: mime });
@@ -1600,7 +1644,7 @@
     recorder.start();
     await videoEl.play();
     const startTime = performance.now();
-    const durationMs = videoEl.duration * 1000;
+    const durationMs = Math.min(videoEl.duration, MAX_VIDEO_EXPORT_SECONDS) * 1000;
 
     let stopping = false;
     const tickTimer = setInterval(() => {
@@ -1627,7 +1671,7 @@
     const { fetchFile } = FFmpegUtil;
     const ffmpeg = await getFFmpeg();
     await ffmpeg.writeFile("input.webm", await fetchFile(webmBlob));
-    await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr", "-movflags", "+faststart", "output.mp4"]);
+    await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "output.mp4"]);
     const data = await ffmpeg.readFile("output.mp4");
     try { await ffmpeg.deleteFile("input.webm"); await ffmpeg.deleteFile("output.mp4"); } catch(e){}
     return new Blob([data.buffer], { type: "video/mp4" });

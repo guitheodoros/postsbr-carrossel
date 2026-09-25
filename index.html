@@ -400,6 +400,15 @@
               <option value="video">Vídeo</option>
             </select>
           </div>
+          <div class="field" id="layoutField" style="display:none">
+            <label for="bgLayout">Layout de fotos</label>
+            <select id="bgLayout">
+              <option value="single">1 foto</option>
+              <option value="g2">2 fotos</option>
+              <option value="g3">3 fotos</option>
+              <option value="g4">4 fotos</option>
+            </select>
+          </div>
           <div class="field" id="color1Field">
             <label for="bgColor1">Cor 1</label>
             <input type="color" id="bgColor1" value="#17161b">
@@ -410,13 +419,6 @@
           </div>
         </div>
         <div class="field" id="imageField" style="display:none">
-          <label for="bgLayout">Layout de fotos</label>
-          <select id="bgLayout">
-            <option value="single">1 foto (tela cheia)</option>
-            <option value="g2">2 fotos (uma em cima, outra embaixo)</option>
-            <option value="g3">3 fotos (1 em cima, 2 embaixo)</option>
-            <option value="g4">4 fotos (2 linhas × 2 colunas)</option>
-          </select>
           <div class="cell-picker" id="cellPicker"></div>
           <span class="field-label">Carregar imagem(ns)</span>
           <input type="text" id="bgImageName" readonly placeholder="Nenhuma imagem" style="display:none">
@@ -1364,6 +1366,7 @@
     const isImage = s.bg.type === "image", isVideo = s.bg.type === "video";
     $("color2Field").style.display = s.bg.type === "gradient" ? "flex" : "none";
     $("imageField").style.display = isImage ? "flex" : "none";
+    $("layoutField").style.display = isImage ? "flex" : "none";
     $("videoField").style.display = isVideo ? "flex" : "none";
     $("serverUrlField").style.display = isVideo ? "flex" : "none";
     $("overlayField").style.display = (isImage || isVideo) ? "flex" : "none";
@@ -1437,6 +1440,7 @@
     const isImage = e.target.value === "image", isVideo = e.target.value === "video";
     $("color2Field").style.display = e.target.value === "gradient" ? "flex" : "none";
     $("imageField").style.display = isImage ? "flex" : "none";
+    $("layoutField").style.display = isImage ? "flex" : "none";
     $("videoField").style.display = isVideo ? "flex" : "none";
     $("serverUrlField").style.display = isVideo ? "flex" : "none";
     $("overlayField").style.display = (isImage || isVideo) ? "flex" : "none";

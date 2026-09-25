@@ -124,6 +124,11 @@
   .thumb-controls button:hover:not(:disabled){ color:var(--ink); }
   .thumb-controls button:disabled{ opacity:.3; cursor:not-allowed; }
 
+  .cell-picker{ display:flex; flex-wrap:wrap; gap:6px; }
+  .cell-picker:empty{ display:none; }
+  .cell-picker button{ padding:5px 10px; font-size:11px; border:1px solid var(--line); border-radius:999px;
+    background:var(--paper-2); color:var(--ink); cursor:pointer; }
+  .cell-picker button.active{ border-color:var(--accent); color:var(--accent); }
   .media-pool{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
   .media-pool:empty{ display:none; }
   .media-pool-item{ position:relative; width:56px; height:56px; border-radius:5px; overflow:hidden;
@@ -392,6 +397,14 @@
           </div>
         </div>
         <div class="field" id="imageField" style="display:none">
+          <label for="bgLayout">Layout de fotos</label>
+          <select id="bgLayout">
+            <option value="single">1 foto (tela cheia)</option>
+            <option value="g2">2 fotos (uma em cima, outra embaixo)</option>
+            <option value="g3">3 fotos (1 em cima, 2 embaixo)</option>
+            <option value="g4">4 fotos (2 linhas × 2 colunas)</option>
+          </select>
+          <div class="cell-picker" id="cellPicker"></div>
           <label for="bgImage">Carregar imagem(ns)</label>
           <input type="text" id="bgImageName" readonly placeholder="Nenhuma imagem" style="display:none">
           <input type="file" id="bgImage" accept="image/*" multiple>
@@ -594,6 +607,39 @@
     return (l1 + l2) / 2 < 0.5;
   }
 
+  // ---- photo grid layouts (image backgrounds only) ----
+  const GRID_COUNTS = { g2:2, g3:3, g4:4 };
+  function isGrid(s){ return s.bg.type === "image" && !!GRID_COUNTS[s.bg.layout]; }
+  function newCell(){ return { image:null, img:null, poolId:null, cropX:0.5, cropY:0.5, zoom:1 }; }
+  function ensureCells(s){
+    const n = GRID_COUNTS[s.bg.layout] || 0;
+    if (!Array.isArray(s.bg.cells)) s.bg.cells = [];
+    while (s.bg.cells.length < n) s.bg.cells.push(newCell());
+    if (!(s.bg.activeCell >= 0 && s.bg.activeCell < n)) s.bg.activeCell = 0;
+  }
+  // the object holding the image/crop/zoom currently being edited (slide bg, or one grid cell)
+  function mediaTarget(s){
+    if (isGrid(s)){ ensureCells(s); return s.bg.cells[s.bg.activeCell]; }
+    return s.bg;
+  }
+  function cellRects(layout, W, H){
+    const g = Math.max(2, Math.round(W*0.006));
+    const halfH = (H-g)/2, halfW = (W-g)/2;
+    if (layout === "g2") return [[0,0,W,halfH],[0,halfH+g,W,halfH]];
+    if (layout === "g3") return [[0,0,W,halfH],[0,halfH+g,halfW,halfH],[halfW+g,halfH+g,halfW,halfH]];
+    if (layout === "g4") return [[0,0,halfW,halfH],[halfW+g,0,halfW,halfH],[0,halfH+g,halfW,halfH],[halfW+g,halfH+g,halfW,halfH]];
+    return [[0,0,W,H]];
+  }
+  function drawCover(ctx, media, iw, ih, rect, zoom, cropX, cropY){
+    const [rx,ry,rw,rh] = rect;
+    const scale = Math.max(rw/iw, rh/ih) * zoom;
+    const dw = iw*scale, dh = ih*scale;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(rx,ry,rw,rh); ctx.clip();
+    ctx.drawImage(media, rx + (rw-dw)*cropX, ry + (rh-dh)*cropY, dw, dh);
+    ctx.restore();
+  }
+
   function slide(opts){
     return Object.assign({
       id: uid(),
@@ -608,7 +654,7 @@
       textColor: "#ffffff",
       showLogo: true,
       bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
-        videoUrl:null, videoEl:null, videoName:null, poolId:null }
+        videoUrl:null, videoEl:null, videoName:null, poolId:null, layout:"single", cells:[], activeCell:0 }
     }, opts);
   }
 
@@ -658,7 +704,9 @@
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
-        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, poolId: s.bg.poolId || null }
+        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, poolId: s.bg.poolId || null,
+          layout: s.bg.layout || "single",
+          cells: (s.bg.cells || []).map(c => ({ image: c.image, poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom })) }
       }))
     };
   }
@@ -712,7 +760,17 @@
     parsed.slides = parsed.slides.map(raw => {
       const s = slide(raw);
       s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
-        videoUrl:null, videoEl:null, videoName:null, poolId:null }, raw.bg);
+        videoUrl:null, videoEl:null, videoName:null, poolId:null, layout:"single", cells:[], activeCell:0 }, raw.bg);
+      s.bg.cells = (Array.isArray(s.bg.cells) ? s.bg.cells : []).map(c => {
+        const cell = Object.assign(newCell(), c, { img:null });
+        if (cell.image){
+          const im = new Image();
+          im.onload = () => scheduleRender();
+          im.src = cell.image;
+          cell.img = im;
+        }
+        return cell;
+      });
       if (s.bg.type === "image" && s.bg.image){
         const img = new Image();
         img.onload = () => scheduleRender();
@@ -820,7 +878,19 @@
       const mediaReady = isVideo
         ? (media && media.readyState >= 2 && media.videoWidth)
         : (media && media.complete && media.naturalWidth);
-      if (mediaReady){
+      if (!isVideo && isGrid(s)){
+        ensureCells(s);
+        const rects = cellRects(s.bg.layout, W, H);
+        rects.forEach((r, i) => {
+          const c = s.bg.cells[i];
+          if (c.img && c.img.complete && c.img.naturalWidth){
+            drawCover(ctx, c.img, c.img.naturalWidth, c.img.naturalHeight, r, c.zoom != null ? c.zoom : 1,
+              c.cropX != null ? c.cropX : 0.5, c.cropY != null ? c.cropY : 0.5);
+          } else {
+            ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(r[0],r[1],r[2],r[3]);
+          }
+        });
+      } else if (mediaReady){
         const iw = isVideo ? media.videoWidth : media.naturalWidth;
         const ih = isVideo ? media.videoHeight : media.naturalHeight;
         const zoom = s.bg.zoom != null ? s.bg.zoom : 1;
@@ -834,6 +904,17 @@
       if (overlayAlpha > 0){
         ctx.fillStyle = "rgba(0,0,0," + overlayAlpha + ")";
         ctx.fillRect(0,0,W,H);
+      }
+      // editing aid: outline the active cell in the live preview only (never in exports/thumbnails)
+      if (!isVideo && isGrid(s) && ctx.canvas === mainCanvas){
+        const r = cellRects(s.bg.layout, W, H)[s.bg.activeCell] || null;
+        if (r){
+          ctx.save();
+          ctx.strokeStyle = brand.accent; ctx.lineWidth = Math.max(4, Math.round(W*0.005));
+          ctx.setLineDash([Math.round(W*0.02), Math.round(W*0.012)]);
+          ctx.strokeRect(r[0]+ctx.lineWidth/2, r[1]+ctx.lineWidth/2, r[2]-ctx.lineWidth, r[3]-ctx.lineWidth);
+          ctx.restore();
+        }
       }
     }
 
@@ -1154,6 +1235,7 @@
     const copy = JSON.parse(JSON.stringify(state.slides[i]));
     copy.id = uid();
     copy.bg.img = state.slides[i].bg.img || null;
+    copy.bg.cells = (state.slides[i].bg.cells || []).map(c => Object.assign(newCell(), c, { img: c.img }));
     copy.bg.videoEl = state.slides[i].bg.videoUrl ? createVideoElement(state.slides[i].bg.videoUrl) : null;
     state.slides.splice(i+1,0,copy);
     state.selectedId = copy.id;
@@ -1230,7 +1312,9 @@
     const overlay = s.bg.imageOverlay != null ? s.bg.imageOverlay : 40;
     $("bgOverlay").value = overlay;
     $("overlayValue").textContent = overlay + "%";
-    const zoomPct = Math.round((s.bg.zoom != null ? s.bg.zoom : 1) * 100);
+    $("bgLayout").value = GRID_COUNTS[s.bg.layout] ? s.bg.layout : "single";
+    buildCellPicker(s);
+    const zoomPct = Math.round((mediaTarget(s).zoom != null ? mediaTarget(s).zoom : 1) * 100);
     $("bgZoom").value = zoomPct;
     $("bgZoomValue").textContent = zoomPct + "%";
     updateCropAffordance(s);
@@ -1301,7 +1385,36 @@
     syncVideoPlayback();
     updateExportLabels();
     buildMediaGallery();
+    buildCellPicker(s);
     scheduleRender();
+  });
+  function buildCellPicker(s){
+    const el = $("cellPicker");
+    el.innerHTML = "";
+    if (!isGrid(s)) return;
+    ensureCells(s);
+    s.bg.cells.slice(0, GRID_COUNTS[s.bg.layout]).forEach((c, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = i === s.bg.activeCell ? "active" : "";
+      b.textContent = "Foto " + (i+1) + (c.img ? "" : " (vazia)");
+      b.addEventListener("click", () => setActiveCell(i));
+      el.appendChild(b);
+    });
+  }
+  function setActiveCell(i){
+    const s = selectedSlide();
+    s.bg.activeCell = i;
+    const z = Math.round((mediaTarget(s).zoom != null ? mediaTarget(s).zoom : 1) * 100);
+    $("bgZoom").value = z; $("bgZoomValue").textContent = z + "%";
+    buildCellPicker(s); buildMediaGallery(); scheduleRender();
+  }
+  bindField("bgLayout","change", e => {
+    const s = selectedSlide();
+    s.bg.layout = e.target.value;
+    s.bg.activeCell = 0;
+    if (isGrid(s)) ensureCells(s);
+    syncEditor(); scheduleRender(); scheduleSave();
   });
   bindField("bgOverlay","input", e => {
     selectedSlide().bg.imageOverlay = Number(e.target.value);
@@ -1310,14 +1423,15 @@
   });
   bindField("bgZoom","input", e => {
     const s = selectedSlide();
-    s.bg.zoom = Number(e.target.value) / 100;
+    mediaTarget(s).zoom = Number(e.target.value) / 100;
     $("bgZoomValue").textContent = e.target.value + "%";
     updateCropAffordance(s);
     scheduleRender();
   });
   $("resetCrop").addEventListener("click", () => {
     const s = selectedSlide();
-    s.bg.cropX = 0.5; s.bg.cropY = 0.5; s.bg.zoom = 1;
+    const t = mediaTarget(s);
+    t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1;
     $("bgZoom").value = 100;
     $("bgZoomValue").textContent = "100%";
     scheduleRender(); scheduleSave();
@@ -1326,7 +1440,7 @@
   // drag-to-reposition the background image or video directly on the live preview
   function bgMedia(s){
     if (s.bg.type === "video") return s.bg.videoEl;
-    if (s.bg.type === "image") return s.bg.img;
+    if (s.bg.type === "image") return mediaTarget(s).img;
     return null;
   }
   function bgMediaSize(s){
@@ -1345,8 +1459,15 @@
   let cropDrag = null;
   mainCanvas.addEventListener("pointerdown", e => {
     const s = selectedSlide();
-    if (!bgDraggable(s) || !bgMediaSize(s)) return;
+    if (!bgDraggable(s)) return;
     const rect = mainCanvas.getBoundingClientRect();
+    if (isGrid(s)){
+      const [W,H] = dims();
+      const px = (e.clientX-rect.left) * (W/rect.width), py = (e.clientY-rect.top) * (H/rect.height);
+      const hit = cellRects(s.bg.layout, W, H).findIndex(r => px>=r[0] && px<=r[0]+r[2] && py>=r[1] && py<=r[1]+r[3]);
+      if (hit >= 0 && hit !== s.bg.activeCell) setActiveCell(hit);
+    }
+    if (!bgMediaSize(s)) return;
     cropDrag = { pointerId: e.pointerId, lastX: e.clientX, lastY: e.clientY, scale: mainCanvas.width / rect.width };
     mainCanvas.setPointerCapture(e.pointerId);
     mainCanvas.style.cursor = "grabbing";
@@ -1362,16 +1483,18 @@
     cropDrag.lastX = e.clientX; cropDrag.lastY = e.clientY;
     const [W,H] = dims();
     const [iw, ih] = size;
-    const zoom = s.bg.zoom != null ? s.bg.zoom : 1;
-    const mediaScale = Math.max(W/iw, H/ih) * zoom;
+    const tgt = mediaTarget(s);
+    const zoom = tgt.zoom != null ? tgt.zoom : 1;
+    const cr = isGrid(s) ? cellRects(s.bg.layout, W, H)[s.bg.activeCell] : [0,0,W,H];
+    const mediaScale = Math.max(cr[2]/iw, cr[3]/ih) * zoom;
     const dw = iw*mediaScale, dh = ih*mediaScale;
-    const overflowX = dw - W, overflowY = dh - H;
+    const overflowX = dw - cr[2], overflowY = dh - cr[3];
     const dxCanvas = dxClient * cropDrag.scale, dyCanvas = dyClient * cropDrag.scale;
-    let cropX = s.bg.cropX != null ? s.bg.cropX : 0.5;
-    let cropY = s.bg.cropY != null ? s.bg.cropY : 0.5;
+    let cropX = tgt.cropX != null ? tgt.cropX : 0.5;
+    let cropY = tgt.cropY != null ? tgt.cropY : 0.5;
     if (overflowX > 0) cropX = Math.min(1, Math.max(0, cropX - dxCanvas/overflowX));
     if (overflowY > 0) cropY = Math.min(1, Math.max(0, cropY - dyCanvas/overflowY));
-    s.bg.cropX = cropX; s.bg.cropY = cropY;
+    tgt.cropX = cropX; tgt.cropY = cropY;
     scheduleRender();
   });
   function endCropDrag(e){
@@ -1391,7 +1514,7 @@
     el.innerHTML = "";
     state.mediaPool.forEach(item => {
       const div = document.createElement("div");
-      div.className = "media-pool-item" + (s.bg.type === "image" && s.bg.poolId === item.id ? " active" : "");
+      div.className = "media-pool-item" + (s.bg.type === "image" && mediaTarget(s).poolId === item.id ? " active" : "");
       div.title = item.name || "";
       const img = document.createElement("img");
       img.src = item.dataUrl;
@@ -1408,11 +1531,14 @@
 
   function applyPoolImageToSelectedSlide(item){
     const s = selectedSlide();
-    s.bg.image = item.dataUrl;
-    s.bg.img = item.img;
-    s.bg.poolId = item.id;
+    const t = mediaTarget(s);
+    t.image = item.dataUrl;
+    t.img = item.img;
+    t.poolId = item.id;
+    if (t !== s.bg){ t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1; }
     scheduleRender(); scheduleSave();
     buildMediaGallery();
+    buildCellPicker(s);
   }
 
   function removePoolImage(id){
@@ -1436,11 +1562,22 @@
     if (!results.length) return;
     state.mediaPool.push(...results);
     const s = selectedSlide();
-    s.bg.image = results[0].dataUrl;
-    s.bg.img = results[0].img;
-    s.bg.poolId = results[0].id;
+    if (isGrid(s)){
+      // fill consecutive cells starting at the active one
+      ensureCells(s);
+      results.forEach((r, k) => {
+        const c = s.bg.cells[s.bg.activeCell + k];
+        if (!c) return;
+        c.image = r.dataUrl; c.img = r.img; c.poolId = r.id; c.cropX = 0.5; c.cropY = 0.5; c.zoom = 1;
+      });
+    } else {
+      s.bg.image = results[0].dataUrl;
+      s.bg.img = results[0].img;
+      s.bg.poolId = results[0].id;
+    }
     scheduleRender();
     buildMediaGallery();
+    buildCellPicker(s);
     scheduleSave();
   }
 

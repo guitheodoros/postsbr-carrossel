@@ -198,6 +198,10 @@
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
   .btn:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
   .export-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .site-footer{ margin-top:40px; padding-top:16px; border-top:1px solid var(--line); text-align:center;
+    font-family:'IBM Plex Mono'; font-size:11px; color:var(--ink-soft); }
+  .site-footer a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px solid var(--line); }
+  .site-footer a:hover, .site-footer a:focus-visible{ color:var(--accent); border-bottom-color:var(--accent); }
   .export-note{ font-family:'IBM Plex Mono'; font-size:11px; color:var(--ink-soft); }
 
   .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(16px);
@@ -487,6 +491,10 @@
       </div>
     </section>
   </div>
+
+  <footer class="site-footer">
+    <a href="https://theodoros.cc" target="_blank" rel="noopener">theodoros.cc</a>
+  </footer>
 </div>
 
 <div class="toast" id="toast"></div>

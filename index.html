@@ -1505,6 +1505,12 @@
     const s = selectedSlide();
     s.bg.type = e.target.value;
     const isImage = e.target.value === "image", isVideo = e.target.value === "video";
+    if (isImage){
+      // choosing Imagem always starts on the single-photo layout
+      s.bg.layout = "single";
+      s.bg.activeCell = 0;
+      $("bgLayout").value = "single";
+    }
     $("color2Field").style.display = e.target.value === "gradient" ? "flex" : "none";
     $("imageField").style.display = isImage ? "flex" : "none";
     $("layoutField").style.display = isImage ? "flex" : "none";

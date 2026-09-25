@@ -431,8 +431,13 @@
           <div class="media-pool" id="mediaPool"></div>
         </div>
         <div class="field" id="videoField" style="display:none">
-          <label for="bgVideo">Carregar vídeo</label>
-          <input type="file" id="bgVideo" accept="video/*">
+          <span class="field-label">Carregar vídeo</span>
+          <label class="dropzone" id="bgVideoDrop" for="bgVideo">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+            <span><strong>Clique para enviar</strong> ou arraste e solte</span>
+            <span class="export-note">um arquivo de vídeo</span>
+          </label>
+          <input type="file" id="bgVideo" accept="video/*" class="visually-hidden">
           <span class="export-note" id="videoStatus" style="margin-top:2px;"></span>
         </div>
         <div class="field" id="serverUrlField" style="display:none">
@@ -1650,9 +1655,8 @@
     addFilesToPool(e.target.files);
     e.target.value = ""; // permite selecionar os mesmos arquivos de novo depois
   });
-  // drag & drop files onto the upload area (ignores in-page drags such as slide reordering)
-  (function(){
-    const zone = $("bgDrop");
+  // drag & drop files onto an upload area (ignores in-page drags such as slide reordering)
+  function setupDropzone(zone, mimePrefix, errorMsg, onFiles){
     const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
     ["dragenter","dragover"].forEach(ev => zone.addEventListener(ev, e => {
       if (!hasFiles(e)) return;
@@ -1667,13 +1671,14 @@
       if (!hasFiles(e)) return;
       e.preventDefault();
       zone.classList.remove("drag-over");
-      const imgs = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
-      if (!imgs.length){ toastMsg("Arraste arquivos de imagem"); return; }
-      addFilesToPool(imgs);
+      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith(mimePrefix));
+      if (!files.length){ toastMsg(errorMsg); return; }
+      onFiles(files);
     });
-  })();
-  bindField("bgVideo","change", e => {
-    const file = e.target.files[0];
+  }
+  setupDropzone($("bgDrop"), "image/", "Arraste arquivos de imagem", addFilesToPool);
+  setupDropzone($("bgVideoDrop"), "video/", "Arraste um arquivo de vídeo", files => loadVideoFile(files[0]));
+  function loadVideoFile(file){
     if (!file) return;
     const s = selectedSlide();
     if (s.bg.videoEl){ s.bg.videoEl.pause(); s.bg.videoEl.remove(); }
@@ -1688,6 +1693,10 @@
     });
     $("videoStatus").textContent = file.name;
     scheduleRender(); scheduleSave();
+  }
+  bindField("bgVideo","change", e => {
+    loadVideoFile(e.target.files[0]);
+    e.target.value = "";
   });
   bindField("serverUrlInput","input", e => setServerUrl(e.target.value));
 

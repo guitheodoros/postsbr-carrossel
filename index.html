@@ -88,7 +88,7 @@
   .new-carrossel-btn{ position:absolute; top:0; right:0; }
 
   .field{ display:flex; flex-direction:column; gap:5px; }
-  .field label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:600; }
+  .field label, .field .field-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:600; }
   .field-row{ display:flex; gap:8px; align-items:center; }
   .check{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); }
   .check input{ accent-color:var(--accent); }
@@ -128,6 +128,15 @@
   .thumb-controls button:hover:not(:disabled){ color:var(--ink); }
   .thumb-controls button:disabled{ opacity:.3; cursor:not-allowed; }
 
+  .field label.dropzone{ text-transform:none; letter-spacing:0; font-size:12px; font-weight:400; }
+  .dropzone{ display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center;
+    padding:14px 10px; border:1.5px dashed var(--line); border-radius:8px; background:var(--paper-2);
+    color:var(--ink-soft); font-size:12px; cursor:pointer; transition:border-color .15s, background .15s, color .15s; }
+  .dropzone strong{ color:var(--ink); font-weight:600; }
+  .dropzone:hover, .dropzone:focus-within, .dropzone.drag-over{ border-color:var(--accent); color:var(--accent); }
+  .dropzone.drag-over{ background:var(--paper); border-style:solid; }
+  .visually-hidden{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden;
+    clip:rect(0,0,0,0); border:0; opacity:0; }
   .cell-picker{ display:flex; flex-wrap:wrap; gap:6px; }
   .cell-picker:empty{ display:none; }
   .cell-picker button{ padding:5px 10px; font-size:11px; border:1px solid var(--line); border-radius:999px;
@@ -409,9 +418,14 @@
             <option value="g4">4 fotos (2 linhas × 2 colunas)</option>
           </select>
           <div class="cell-picker" id="cellPicker"></div>
-          <label for="bgImage">Carregar imagem(ns)</label>
+          <span class="field-label">Carregar imagem(ns)</span>
           <input type="text" id="bgImageName" readonly placeholder="Nenhuma imagem" style="display:none">
-          <input type="file" id="bgImage" accept="image/*" multiple>
+          <label class="dropzone" id="bgDrop" for="bgImage">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+            <span><strong>Clique para enviar</strong> ou arraste e solte</span>
+            <span class="export-note">uma ou várias imagens</span>
+          </label>
+          <input type="file" id="bgImage" accept="image/*" multiple class="visually-hidden">
           <div class="media-pool" id="mediaPool"></div>
         </div>
         <div class="field" id="videoField" style="display:none">
@@ -1632,6 +1646,28 @@
     addFilesToPool(e.target.files);
     e.target.value = ""; // permite selecionar os mesmos arquivos de novo depois
   });
+  // drag & drop files onto the upload area (ignores in-page drags such as slide reordering)
+  (function(){
+    const zone = $("bgDrop");
+    const hasFiles = (e) => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes("Files");
+    ["dragenter","dragover"].forEach(ev => zone.addEventListener(ev, e => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      zone.classList.add("drag-over");
+    }));
+    zone.addEventListener("dragleave", e => {
+      if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over");
+    });
+    zone.addEventListener("drop", e => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      zone.classList.remove("drag-over");
+      const imgs = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith("image/"));
+      if (!imgs.length){ toastMsg("Arraste arquivos de imagem"); return; }
+      addFilesToPool(imgs);
+    });
+  })();
   bindField("bgVideo","change", e => {
     const file = e.target.files[0];
     if (!file) return;

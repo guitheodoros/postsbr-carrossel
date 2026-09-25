@@ -369,7 +369,7 @@
             <input type="color" id="eyebrowColorInput" title="Cor do texto do rótulo" value="#ff4b2e">
           </div>
           <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
-            <span class="check"><input type="checkbox" id="eyebrowBgOn"> fundo atrás do rótulo</span>
+            <span class="check"><input type="checkbox" id="eyebrowBgOn"> Fundo do rótulo</span>
             <input type="color" id="eyebrowBgColor" title="Cor do fundo do rótulo" value="#ff4b2e" style="display:none;">
           </div>
         </div>
@@ -1055,18 +1055,13 @@
       const padX = eyebrowSize*0.75;
       const pillW = textW + padX*2, pillH = eyebrowH;
       const pillX = s.halign === "center" ? boxLeft + (boxWidth-pillW)/2 : boxLeft;
-      const r = Math.min(pillH*0.28, pillW/2);
       ctx.fillStyle = s.eyebrowBgColor || brand.accent;
-      ctx.beginPath();
-      ctx.moveTo(pillX+r, y);
-      ctx.arcTo(pillX+pillW, y, pillX+pillW, y+pillH, r);
-      ctx.arcTo(pillX+pillW, y+pillH, pillX, y+pillH, r);
-      ctx.arcTo(pillX, y+pillH, pillX, y, r);
-      ctx.arcTo(pillX, y, pillX+pillW, y, r);
-      ctx.closePath(); ctx.fill();
+      ctx.fillRect(pillX, y, pillW, pillH);
       ctx.fillStyle = s.eyebrowColor || "#ffffff";
       ctx.textBaseline = "alphabetic";
-      ctx.fillText(label, pillX+padX, y + pillH/2 + m.actualBoundingBoxAscent/2);
+      // center on cap height (not on the label's own glyphs, so accents don't shift it)
+      const capH = ctx.measureText("H").actualBoundingBoxAscent;
+      ctx.fillText(label, pillX+padX, y + pillH/2 + capH/2);
       ctx.textBaseline = "top";
       try { ctx.letterSpacing = "0px"; } catch(e){}
       y += pillH + gap;

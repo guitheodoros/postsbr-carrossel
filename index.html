@@ -117,6 +117,10 @@
   .thumb{ position:relative; border:1.5px solid var(--line); border-radius:7px; padding:6px; cursor:pointer;
     background:var(--paper-2); transition:border-color .15s; width:132px; flex-shrink:0; }
   .thumb.active{ border-color:var(--accent); }
+  .thumb[draggable="true"]{ cursor:grab; }
+  .thumb.dragging{ opacity:.4; }
+  .thumb.drop-before{ box-shadow:-4px 0 0 0 var(--accent); }
+  .thumb.drop-after{ box-shadow:4px 0 0 0 var(--accent); }
   .thumb canvas{ display:block; width:100%; height:auto; border-radius:3px; }
   .thumb-controls{ display:flex; justify-content:space-between; margin-top:6px; opacity:0; transition:opacity .15s; }
   .thumb:hover .thumb-controls, .thumb.active .thumb-controls{ opacity:1; }
@@ -1168,6 +1172,16 @@
     $("exportNote").textContent = (s.bg.type === "video" ? "MP4" : "PNG") + " · " + W + " × " + H;
   }
 
+  let dragFrom = null;
+  function clearDropMarks(){
+    document.querySelectorAll("#thumbs .thumb").forEach(n => n.classList.remove("dragging","drop-before","drop-after"));
+  }
+  function moveSlide(from, to){
+    const [moved] = state.slides.splice(from, 1);
+    state.slides.splice(to, 0, moved);
+    buildFilmstrip(); syncEditor(); renderMain(); scheduleSave();
+  }
+
   function buildFilmstrip(){
     const wrap = $("thumbs");
     wrap.innerHTML = "";
@@ -1203,6 +1217,39 @@
       div.appendChild(controls);
 
       div.addEventListener("click", () => selectSlide(s.id));
+
+      // drag and drop to reorder
+      div.draggable = true;
+      div.addEventListener("dragstart", (e) => {
+        dragFrom = i;
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(i));
+        div.classList.add("dragging");
+      });
+      div.addEventListener("dragend", () => { dragFrom = null; clearDropMarks(); });
+      div.addEventListener("dragover", (e) => {
+        if (dragFrom === null) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        const r = div.getBoundingClientRect();
+        const after = (e.clientX - r.left) > r.width/2;
+        clearDropMarks();
+        div.classList.add(after ? "drop-after" : "drop-before");
+      });
+      div.addEventListener("dragleave", () => div.classList.remove("drop-before","drop-after"));
+      div.addEventListener("drop", (e) => {
+        if (dragFrom === null) return;
+        e.preventDefault();
+        const r = div.getBoundingClientRect();
+        const after = (e.clientX - r.left) > r.width/2;
+        let to = i + (after ? 1 : 0);
+        const from = dragFrom;
+        dragFrom = null;
+        clearDropMarks();
+        if (from < to) to--;
+        if (to !== from) moveSlide(from, to);
+      });
+
       wrap.appendChild(div);
       redrawThumb(s);
     });

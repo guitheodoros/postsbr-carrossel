@@ -458,6 +458,11 @@
             <input type="range" id="bgZoom" min="100" max="300" step="1" value="100" style="flex:1;">
             <span class="export-note" id="bgZoomValue" style="min-width:34px;">100%</span>
           </div>
+          <label for="bgRotate" style="margin-top:6px;">Rotação</label>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <input type="range" id="bgRotate" min="-180" max="180" step="1" value="0" style="flex:1;">
+            <span class="export-note" id="bgRotateValue" style="min-width:34px;">0°</span>
+          </div>
           <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
             <span class="export-note">arraste o fundo no preview para reposicionar</span>
             <button class="btn" id="resetCrop" type="button" style="padding:6px 10px; font-size:11px;">redefinir</button>
@@ -635,7 +640,7 @@
   // ---- photo grid layouts (image backgrounds only) ----
   const GRID_COUNTS = { g2:2, g3:3, g4:4 };
   function isGrid(s){ return s.bg.type === "image" && !!GRID_COUNTS[s.bg.layout]; }
-  function newCell(){ return { image:null, img:null, poolId:null, cropX:0.5, cropY:0.5, zoom:1 }; }
+  function newCell(){ return { image:null, img:null, poolId:null, cropX:0.5, cropY:0.5, zoom:1, rot:0 }; }
   function ensureCells(s){
     const n = GRID_COUNTS[s.bg.layout] || 0;
     if (!Array.isArray(s.bg.cells)) s.bg.cells = [];
@@ -655,13 +660,27 @@
     if (layout === "g4") return [[0,0,halfW,halfH],[halfW+g,0,halfW,halfH],[0,halfH+g,halfW,halfH],[halfW+g,halfH+g,halfW,halfH]];
     return [[0,0,W,H]];
   }
-  function drawCover(ctx, media, iw, ih, rect, zoom, cropX, cropY){
-    const [rx,ry,rw,rh] = rect;
-    const scale = Math.max(rw/iw, rh/ih) * zoom;
+  // geometry of a media drawn "cover" inside a rw×rh box, rotated by rot degrees.
+  // Scale grows with rotation so the rotated media always fully covers the box (no empty corners).
+  function coverGeom(iw, ih, rw, rh, zoom, rot){
+    const th = (rot || 0) * Math.PI / 180;
+    const c = Math.abs(Math.cos(th)), sn = Math.abs(Math.sin(th));
+    const bw = rw*c + rh*sn, bh = rw*sn + rh*c;   // box bounding size in the media's own frame
+    const scale = Math.max(bw/iw, bh/ih) * zoom;
     const dw = iw*scale, dh = ih*scale;
+    return { th, dw, dh, ovX: Math.max(0, dw - bw), ovY: Math.max(0, dh - bh) };
+  }
+  function drawCover(ctx, media, iw, ih, rect, zoom, cropX, cropY, rot){
+    const [rx,ry,rw,rh] = rect;
+    const g = coverGeom(iw, ih, rw, rh, zoom, rot);
+    // media center offset from box center, expressed in the media frame, then rotated to canvas frame
+    const ox = -(cropX-0.5)*g.ovX, oy = -(cropY-0.5)*g.ovY;
+    const cos = Math.cos(g.th), sin = Math.sin(g.th);
     ctx.save();
     ctx.beginPath(); ctx.rect(rx,ry,rw,rh); ctx.clip();
-    ctx.drawImage(media, rx + (rw-dw)*cropX, ry + (rh-dh)*cropY, dw, dh);
+    ctx.translate(rx + rw/2 + ox*cos - oy*sin, ry + rh/2 + ox*sin + oy*cos);
+    ctx.rotate(g.th);
+    ctx.drawImage(media, -g.dw/2, -g.dh/2, g.dw, g.dh);
     ctx.restore();
   }
 
@@ -678,7 +697,7 @@
       halign: "left",
       textColor: "#ffffff",
       showLogo: true,
-      bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
+      bg: { type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1, rot:0,
         videoUrl:null, videoEl:null, videoName:null, poolId:null, layout:"single", cells:[], activeCell:0 }
     }, opts);
   }
@@ -729,9 +748,9 @@
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
-        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, poolId: s.bg.poolId || null,
+        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
           layout: s.bg.layout || "single",
-          cells: (s.bg.cells || []).map(c => ({ image: c.image, poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom })) }
+          cells: (s.bg.cells || []).map(c => ({ image: c.image, poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom, rot: c.rot || 0 })) }
       }))
     };
   }
@@ -784,7 +803,7 @@
     let hadVideo = false;
     parsed.slides = parsed.slides.map(raw => {
       const s = slide(raw);
-      s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1,
+      s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1, rot:0,
         videoUrl:null, videoEl:null, videoName:null, poolId:null, layout:"single", cells:[], activeCell:0 }, raw.bg);
       s.bg.cells = (Array.isArray(s.bg.cells) ? s.bg.cells : []).map(c => {
         const cell = Object.assign(newCell(), c, { img:null });
@@ -910,7 +929,7 @@
           const c = s.bg.cells[i];
           if (c.img && c.img.complete && c.img.naturalWidth){
             drawCover(ctx, c.img, c.img.naturalWidth, c.img.naturalHeight, r, c.zoom != null ? c.zoom : 1,
-              c.cropX != null ? c.cropX : 0.5, c.cropY != null ? c.cropY : 0.5);
+              c.cropX != null ? c.cropX : 0.5, c.cropY != null ? c.cropY : 0.5, c.rot || 0);
           } else {
             ctx.fillStyle = "rgba(255,255,255,0.08)"; ctx.fillRect(r[0],r[1],r[2],r[3]);
           }
@@ -918,12 +937,8 @@
       } else if (mediaReady){
         const iw = isVideo ? media.videoWidth : media.naturalWidth;
         const ih = isVideo ? media.videoHeight : media.naturalHeight;
-        const zoom = s.bg.zoom != null ? s.bg.zoom : 1;
-        const scale = Math.max(W/iw, H/ih) * zoom;
-        const dw = iw*scale, dh = ih*scale;
-        const cropX = s.bg.cropX != null ? s.bg.cropX : 0.5;
-        const cropY = s.bg.cropY != null ? s.bg.cropY : 0.5;
-        ctx.drawImage(media, (W-dw)*cropX, (H-dh)*cropY, dw, dh);
+        drawCover(ctx, media, iw, ih, [0,0,W,H], s.bg.zoom != null ? s.bg.zoom : 1,
+          s.bg.cropX != null ? s.bg.cropX : 0.5, s.bg.cropY != null ? s.bg.cropY : 0.5, s.bg.rot || 0);
       }
       const overlayAlpha = (s.bg.imageOverlay != null ? s.bg.imageOverlay : 40) / 100;
       if (overlayAlpha > 0){
@@ -1386,6 +1401,7 @@
     const zoomPct = Math.round((mediaTarget(s).zoom != null ? mediaTarget(s).zoom : 1) * 100);
     $("bgZoom").value = zoomPct;
     $("bgZoomValue").textContent = zoomPct + "%";
+    syncRotateUI(s);
     updateCropAffordance(s);
     syncVideoPlayback();
     updateExportLabels();
@@ -1458,6 +1474,16 @@
     buildCellPicker(s);
     scheduleRender();
   });
+  function syncRotateUI(s){
+    const r = Math.round(mediaTarget(s).rot || 0);
+    $("bgRotate").value = r;
+    $("bgRotateValue").textContent = r + "°";
+  }
+  bindField("bgRotate","input", e => {
+    mediaTarget(selectedSlide()).rot = Number(e.target.value);
+    $("bgRotateValue").textContent = e.target.value + "°";
+    scheduleRender();
+  });
   function buildCellPicker(s){
     const el = $("cellPicker");
     el.innerHTML = "";
@@ -1477,6 +1503,7 @@
     s.bg.activeCell = i;
     const z = Math.round((mediaTarget(s).zoom != null ? mediaTarget(s).zoom : 1) * 100);
     $("bgZoom").value = z; $("bgZoomValue").textContent = z + "%";
+    syncRotateUI(s);
     buildCellPicker(s); buildMediaGallery(); scheduleRender();
   }
   bindField("bgLayout","change", e => {
@@ -1501,8 +1528,9 @@
   $("resetCrop").addEventListener("click", () => {
     const s = selectedSlide();
     const t = mediaTarget(s);
-    t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1;
+    t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1; t.rot = 0;
     $("bgZoom").value = 100;
+    $("bgRotate").value = 0; $("bgRotateValue").textContent = "0°";
     $("bgZoomValue").textContent = "100%";
     scheduleRender(); scheduleSave();
   });
@@ -1556,10 +1584,12 @@
     const tgt = mediaTarget(s);
     const zoom = tgt.zoom != null ? tgt.zoom : 1;
     const cr = isGrid(s) ? cellRects(s.bg.layout, W, H)[s.bg.activeCell] : [0,0,W,H];
-    const mediaScale = Math.max(cr[2]/iw, cr[3]/ih) * zoom;
-    const dw = iw*mediaScale, dh = ih*mediaScale;
-    const overflowX = dw - cr[2], overflowY = dh - cr[3];
-    const dxCanvas = dxClient * cropDrag.scale, dyCanvas = dyClient * cropDrag.scale;
+    const g = coverGeom(iw, ih, cr[2], cr[3], zoom, tgt.rot || 0);
+    const overflowX = g.ovX, overflowY = g.ovY;
+    // canvas-space drag delta -> media frame (undo the rotation)
+    const cdx = dxClient * cropDrag.scale, cdy = dyClient * cropDrag.scale;
+    const cs = Math.cos(g.th), sn = Math.sin(g.th);
+    const dxCanvas = cdx*cs + cdy*sn, dyCanvas = -cdx*sn + cdy*cs;
     let cropX = tgt.cropX != null ? tgt.cropX : 0.5;
     let cropY = tgt.cropY != null ? tgt.cropY : 0.5;
     if (overflowX > 0) cropX = Math.min(1, Math.max(0, cropX - dxCanvas/overflowX));
@@ -1605,7 +1635,7 @@
     t.image = item.dataUrl;
     t.img = item.img;
     t.poolId = item.id;
-    if (t !== s.bg){ t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1; }
+    if (t !== s.bg){ t.cropX = 0.5; t.cropY = 0.5; t.zoom = 1; t.rot = 0; }
     scheduleRender(); scheduleSave();
     buildMediaGallery();
     buildCellPicker(s);
@@ -1638,7 +1668,7 @@
       results.forEach((r, k) => {
         const c = s.bg.cells[s.bg.activeCell + k];
         if (!c) return;
-        c.image = r.dataUrl; c.img = r.img; c.poolId = r.id; c.cropX = 0.5; c.cropY = 0.5; c.zoom = 1;
+        c.image = r.dataUrl; c.img = r.img; c.poolId = r.id; c.cropX = 0.5; c.cropY = 0.5; c.zoom = 1; c.rot = 0;
       });
     } else {
       s.bg.image = results[0].dataUrl;

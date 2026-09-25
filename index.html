@@ -366,7 +366,11 @@
           <label for="eyebrowInput">Rótulo (opcional)</label>
           <div style="display:flex; gap:8px; align-items:center;">
             <input type="text" id="eyebrowInput" placeholder="Ex.: SALVE PARA DEPOIS" style="flex:1;">
-            <input type="color" id="eyebrowColorInput" title="Cor do rótulo" value="#ff4b2e">
+            <input type="color" id="eyebrowColorInput" title="Cor do texto do rótulo" value="#ff4b2e">
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+            <span class="check"><input type="checkbox" id="eyebrowBgOn"> fundo atrás do rótulo</span>
+            <input type="color" id="eyebrowBgColor" title="Cor do fundo do rótulo" value="#ff4b2e" style="display:none;">
           </div>
         </div>
         <div class="field">
@@ -689,6 +693,8 @@
       id: uid(),
       eyebrow: "",
       eyebrowColor: null,
+      eyebrowBg: false,
+      eyebrowBgColor: null,
       headline: "",
       body: "",
       headlineSize: 84,
@@ -745,7 +751,7 @@
       selectedId: state.selectedId,
       mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
       slides: state.slides.map(s => ({
-        id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, headline: s.headline, body: s.body,
+        id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, eyebrowBg: !!s.eyebrowBg, eyebrowBgColor: s.eyebrowBgColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
         bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
@@ -995,7 +1001,7 @@
     const eyebrowSize = Math.round(W*0.026);
     if (s.eyebrow){
       ctx.font = "700 " + eyebrowSize + "px 'Geist'";
-      eyebrowH = eyebrowSize*1.3;
+      eyebrowH = s.eyebrowBg ? eyebrowSize*1.85 : eyebrowSize*1.3;
     }
     try { ctx.letterSpacing = "0px"; } catch(e){}
 
@@ -1038,7 +1044,33 @@
       }
     }
 
-    if (s.eyebrow){
+    if (s.eyebrow && s.eyebrowBg){
+      // label on a pill that hugs the text width
+      const label = s.eyebrow.toUpperCase();
+      ctx.font = "700 " + eyebrowSize + "px 'Geist'";
+      try { ctx.fontVariationSettings = "normal"; } catch(e){}
+      try { ctx.letterSpacing = "0.14em"; } catch(e){}
+      const m = ctx.measureText(label);
+      const textW = m.width - eyebrowSize*0.14; // drop the trailing letter-spacing
+      const padX = eyebrowSize*0.75;
+      const pillW = textW + padX*2, pillH = eyebrowH;
+      const pillX = s.halign === "center" ? boxLeft + (boxWidth-pillW)/2 : boxLeft;
+      const r = Math.min(pillH*0.28, pillW/2);
+      ctx.fillStyle = s.eyebrowBgColor || brand.accent;
+      ctx.beginPath();
+      ctx.moveTo(pillX+r, y);
+      ctx.arcTo(pillX+pillW, y, pillX+pillW, y+pillH, r);
+      ctx.arcTo(pillX+pillW, y+pillH, pillX, y+pillH, r);
+      ctx.arcTo(pillX, y+pillH, pillX, y, r);
+      ctx.arcTo(pillX, y, pillX+pillW, y, r);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = s.eyebrowColor || "#ffffff";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(label, pillX+padX, y + pillH/2 + m.actualBoundingBoxAscent/2);
+      ctx.textBaseline = "top";
+      try { ctx.letterSpacing = "0px"; } catch(e){}
+      y += pillH + gap;
+    } else if (s.eyebrow){
       ctx.fillStyle = s.eyebrowColor || brand.accent;
       try { ctx.letterSpacing = "0.14em"; } catch(e){}
       drawLines([s.eyebrow.toUpperCase()], "700 " + eyebrowSize + "px 'Geist'", eyebrowH);
@@ -1370,7 +1402,10 @@
     $("valignSel").value = s.valign;
     $("halignSel").value = s.halign;
     $("eyebrowInput").value = s.eyebrow;
-    $("eyebrowColorInput").value = s.eyebrowColor || state.brand.accent;
+    $("eyebrowColorInput").value = s.eyebrowColor || (s.eyebrowBg ? "#ffffff" : state.brand.accent);
+    $("eyebrowBgOn").checked = !!s.eyebrowBg;
+    $("eyebrowBgColor").style.display = s.eyebrowBg ? "" : "none";
+    $("eyebrowBgColor").value = s.eyebrowBgColor || state.brand.accent;
     $("headlineInput").value = s.headline;
     $("bodyInput").value = s.body;
     const headlineSize = s.headlineSize != null ? s.headlineSize : 84;
@@ -1427,6 +1462,22 @@
   bindField("valignSel","change", e => { selectedSlide().valign = e.target.value; scheduleRender(); });
   bindField("halignSel","change", e => { selectedSlide().halign = e.target.value; scheduleRender(); });
   bindField("eyebrowInput","input", e => { selectedSlide().eyebrow = e.target.value; scheduleRender(); });
+  bindField("eyebrowBgOn","change", e => {
+    const s = selectedSlide();
+    s.eyebrowBg = e.target.checked;
+    if (s.eyebrowBg){
+      // start with a readable pair: fill takes the current label color, text flips to contrast
+      if (!s.eyebrowBgColor) s.eyebrowBgColor = s.eyebrowColor || state.brand.accent;
+      s.eyebrowColor = relLuminance(s.eyebrowBgColor) > 0.5 ? "#17161b" : "#ffffff";
+    } else {
+      s.eyebrowColor = null;
+    }
+    $("eyebrowColorInput").value = s.eyebrowColor || state.brand.accent;
+    $("eyebrowBgColor").value = s.eyebrowBgColor || state.brand.accent;
+    $("eyebrowBgColor").style.display = s.eyebrowBg ? "" : "none";
+    scheduleRender();
+  });
+  bindField("eyebrowBgColor","input", e => { selectedSlide().eyebrowBgColor = e.target.value; scheduleRender(); });
   bindField("eyebrowColorInput","input", e => { selectedSlide().eyebrowColor = e.target.value; scheduleRender(); });
   bindField("headlineInput","input", e => { selectedSlide().headline = e.target.value; scheduleRender(); });
   bindField("bodyInput","input", e => { selectedSlide().body = e.target.value; scheduleRender(); });

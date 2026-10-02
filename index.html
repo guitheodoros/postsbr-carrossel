@@ -999,10 +999,8 @@
     }
 
     // footer (watermark / page number) reserves space so "base" alignment never sits on top of it
-    let contentBottom = boxBottom;
-    if ((brand.showHandle && brand.handle) || brand.showPageNum){
-      contentBottom = boxBottom - Math.round(W*0.066);
-    }
+    // always reserved, so "base" alignment sits at the same height whether or not @ / numbering are shown
+    const contentBottom = boxBottom - Math.round(W*0.066);
     const boxHeight = contentBottom - contentTop;
 
     ctx.fillStyle = s.textColor;

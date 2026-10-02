@@ -384,7 +384,7 @@
           <div class="label-row"><label for="headlineInput">Título</label><span class="char-count" id="headlineCount"></span></div>
           <textarea id="headlineInput" rows="2"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
-            <input type="range" id="headlineSize" min="80" max="140" step="1" value="84" style="flex:1;">
+            <input type="range" id="headlineSize" min="80" max="135" step="1" value="84" style="flex:1;">
             <span class="export-note" id="headlineSizeValue" style="min-width:34px;">84px</span>
             <button class="btn" id="resetHeadlineSize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
           </div>
@@ -393,8 +393,8 @@
           <div class="label-row"><label for="bodyInput">Texto</label><span class="char-count" id="bodyCount"></span></div>
           <textarea id="bodyInput" rows="3"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
-            <input type="range" id="bodySize" min="30" max="45" step="1" value="30" style="flex:1;">
-            <span class="export-note" id="bodySizeValue" style="min-width:34px;">30px</span>
+            <input type="range" id="bodySize" min="35" max="42" step="1" value="35" style="flex:1;">
+            <span class="export-note" id="bodySizeValue" style="min-width:34px;">35px</span>
             <button class="btn" id="resetBodySize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
           </div>
         </div>
@@ -709,7 +709,7 @@
       headline: "",
       body: "",
       headlineSize: 84,
-      bodySize: 30,
+      bodySize: 35,
       valign: "center",
       halign: "left",
       textColor: "#ffffff",
@@ -1016,23 +1016,23 @@
     }
     try { ctx.letterSpacing = "0px"; } catch(e){}
 
-    const isContentSlide = index > 0 && index < total - 1;
     const headlineBudget = boxHeight*0.62 - eyebrowH;
-    const headlineStartSize = Math.round((s.headlineSize || 84) * (W/1080));
+    const rules = sizeRules(index, total);
+    const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
       weight:"900", family:"Roboto", variation:'"wdth" 87.5', maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
-      startSize:headlineStartSize, minSize:Math.min(Math.round(W*0.032), headlineStartSize), lineHeightRatio:1.12,
-      maxLines: isContentSlide ? 2 : 3
+      startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.12,
+      maxLines: rules.headline.lines
     });
     const headlineH = headlineFit.lines.length * headlineFit.lineHeight;
 
     const usedSoFar = eyebrowH + (eyebrowH?gap:0) + headlineH + gap;
     const bodyBudget = Math.max(boxHeight - usedSoFar, W*0.05);
-    const bodyStartSize = Math.round((s.bodySize || 30) * (W/1080));
+    const bodyStartSize = Math.round(clampSize(s.bodySize, rules.body) * (W/1080));
     const bodyFit = wrapAndFit(ctx, s.body, {
       weight:"400", family:"Roboto", variation:'"wdth" 100', maxWidth:boxWidth, maxHeight:bodyBudget,
-      startSize:bodyStartSize, minSize:Math.min(Math.round(W*0.0241), bodyStartSize), lineHeightRatio:1.45,
-      maxLines: isContentSlide ? 5 : undefined
+      startSize:bodyStartSize, minSize:Math.round(rules.body.min * (W/1080)), lineHeightRatio:1.45,
+      maxLines: rules.body.lines
     });
     const bodyH = s.body ? bodyFit.lines.length * bodyFit.lineHeight : 0;
 
@@ -1395,9 +1395,17 @@
 
   // character limits per slide type (capa/fechamento vs conteúdo). Warning only — typing is never blocked.
   const CHAR_LIMITS = {
-    cover:   { eyebrow: 40, headline: 70, body: 160 },
-    content: { eyebrow: 40, headline: 45, body: 220 }
+    cover:   { eyebrow: 40, headline: 60, body: 200 },
+    content: { eyebrow: 40, headline: 45, body: 250 }
   };
+  // font-size range (px at 1080 wide), default and max lines per slide type.
+  // min is also the floor the auto-fit may shrink to; max is the slider's upper end.
+  const SIZE_RULES = {
+    cover:   { headline: { min:82, max:135, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:3 } },
+    content: { headline: { min:80, max:100, def:84, lines:2 }, body: { min:35, max:42, def:35, lines:5 } }
+  };
+  function sizeRules(i, total){ return SIZE_RULES[(i === 0 || i === total-1) ? "cover" : "content"]; }
+  const clampSize = (v, r) => Math.max(r.min, Math.min(r.max, v != null ? v : r.def));
   function updateCharCounts(){
     const s = selectedSlide(), i = selectedIndex();
     const lim = CHAR_LIMITS[(i === 0 || i === state.slides.length-1) ? "cover" : "content"];
@@ -1430,8 +1438,11 @@
     $("eyebrowBgColor").value = s.eyebrowBgColor || state.brand.accent;
     $("headlineInput").value = s.headline;
     $("bodyInput").value = s.body;
-    const headlineSize = s.headlineSize != null ? s.headlineSize : 84;
-    const bodySize = s.bodySize != null ? s.bodySize : 30;
+    const rules = sizeRules(i, state.slides.length);
+    $("headlineSize").min = rules.headline.min; $("headlineSize").max = rules.headline.max;
+    $("bodySize").min = rules.body.min; $("bodySize").max = rules.body.max;
+    const headlineSize = clampSize(s.headlineSize, rules.headline);
+    const bodySize = clampSize(s.bodySize, rules.body);
     $("headlineSize").value = headlineSize;
     $("headlineSizeValue").textContent = headlineSize + "px";
     $("bodySize").value = bodySize;
@@ -1514,15 +1525,17 @@
     scheduleRender();
   });
   $("resetHeadlineSize").addEventListener("click", () => {
-    selectedSlide().headlineSize = 84;
-    $("headlineSize").value = 84;
-    $("headlineSizeValue").textContent = "84px";
+    const d = sizeRules(selectedIndex(), state.slides.length).headline.def;
+    selectedSlide().headlineSize = d;
+    $("headlineSize").value = d;
+    $("headlineSizeValue").textContent = d + "px";
     scheduleRender(); scheduleSave();
   });
   $("resetBodySize").addEventListener("click", () => {
-    selectedSlide().bodySize = 30;
-    $("bodySize").value = 30;
-    $("bodySizeValue").textContent = "30px";
+    const d = sizeRules(selectedIndex(), state.slides.length).body.def;
+    selectedSlide().bodySize = d;
+    $("bodySize").value = d;
+    $("bodySizeValue").textContent = d + "px";
     scheduleRender(); scheduleSave();
   });
   bindField("textColor","input", e => { selectedSlide().textColor = e.target.value; scheduleRender(); });

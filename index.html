@@ -1031,7 +1031,7 @@
     const bodyStartSize = Math.round(clampSize(s.bodySize, rules.body) * (W/1080));
     const bodyFit = wrapAndFit(ctx, s.body, {
       weight:"400", family:"Roboto", variation:'"wdth" 100', maxWidth:boxWidth, maxHeight:bodyBudget,
-      startSize:bodyStartSize, minSize:Math.round(rules.body.min * (W/1080)), lineHeightRatio:1.45,
+      startSize:bodyStartSize, minSize:Math.round(rules.body.min * (W/1080)), lineHeightRatio:1.30,
       maxLines: rules.body.lines
     });
     const bodyH = s.body ? bodyFit.lines.length * bodyFit.lineHeight : 0;

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>PostSBR v2.2 — Manual de Uso</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 18mm 16mm; }
+  :root{ --ink:#1b1a1f; --soft:#5d5b66; --line:#dedce4; --accent:#e8401f; --paper:#f6f5f8; }
+  *{ box-sizing:border-box; }
+  body{ font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; color:var(--ink); font-size:10.5pt; line-height:1.5; margin:0; }
+  h1{ font-family:Georgia, "Times New Roman", serif; font-size:30pt; line-height:1.1; margin:0 0 6px; letter-spacing:-.01em; }
+  h2{ font-family:Georgia, serif; font-size:16pt; margin:26px 0 8px; padding-top:6px; border-top:2px solid var(--ink); break-after:avoid; }
+  h3{ font-size:11pt; margin:16px 0 4px; break-after:avoid; }
+  p{ margin:6px 0; }
+  ul,ol{ margin:6px 0; padding-left:20px; }
+  li{ margin:3px 0; }
+  .sub{ color:var(--soft); font-size:11.5pt; margin:0 0 16px; }
+  .cover{ border-bottom:2px solid var(--ink); padding-bottom:16px; margin-bottom:8px; }
+  .tag{ display:inline-block; font-size:8.5pt; letter-spacing:.1em; text-transform:uppercase; color:var(--accent); font-weight:700; margin-bottom:8px; }
+  table{ width:100%; border-collapse:collapse; margin:8px 0; font-size:9.8pt; break-inside:avoid; }
+  th,td{ text-align:left; vertical-align:top; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th{ background:var(--paper); font-size:8.8pt; text-transform:uppercase; letter-spacing:.06em; color:var(--soft); }
+  td:first-child{ width:32%; font-weight:600; }
+  table.lim td:first-child{ width:24%; }
+  table.lim td, table.lim th{ text-align:center; }
+  table.lim td:first-child, table.lim th:first-child{ text-align:left; }
+  .note{ background:var(--paper); border-left:3px solid var(--accent); padding:8px 12px; margin:10px 0; break-inside:avoid; }
+  .steps{ break-inside:avoid; counter-reset:s; list-style:none; padding:0; }
+  .steps li{ counter-increment:s; position:relative; padding-left:34px; margin:8px 0; }
+  .steps li::before{ content:counter(s); position:absolute; left:0; top:0; width:22px; height:22px; border-radius:50%;
+    background:var(--ink); color:#fff; font-size:9.5pt; font-weight:700; text-align:center; line-height:22px; }
+  code, .k{ font-family:Menlo, Consolas, monospace; font-size:9.2pt; background:var(--paper); padding:1px 5px; border-radius:3px; }
+  .shot{ position:relative; width:74%; margin:10px auto 6px; border:1px solid var(--line); overflow:hidden; break-inside:avoid; }
+  .shot img{ display:block; width:100%; }
+  .b{ position:absolute; width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700;
+    font-size:10pt; text-align:center; line-height:22px; box-shadow:0 0 0 2px #fff; transform:translate(-50%,-50%); }
+  .legend{ display:grid; grid-template-columns:1fr 1fr; gap:4px 18px; font-size:9.8pt; margin:6px 0 4px; }
+  .legend span b{ display:inline-block; width:18px; height:18px; border-radius:50%; background:var(--accent); color:#fff; text-align:center; line-height:18px; font-size:8.5pt; margin-right:6px; }
+  .pb{ break-before:page; }
+  .cover + h2{ border-top:0; margin-top:14px; }
+  footer.end{ margin-top:26px; color:var(--soft); font-size:9pt; border-top:1px solid var(--line); padding-top:8px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="tag">Manual de uso</div>
+  <h1>PostSBR v2.2</h1>
+  <p class="sub">Criador de carrosséis para Instagram — como montar, ajustar e exportar seus slides.</p>
+  <p>Endereço da ferramenta: <b>carrossel.sneakersbr.co</b> · Não precisa de instalação. Funciona no navegador; recomendamos o <b>Google Chrome</b> no computador.</p>
+</div>
+
+<h2>1. Visão geral da tela</h2>
+<p>A tela tem cinco áreas: as configurações gerais do carrossel no topo, a sequência de slides, o preview do slide, o painel de edição e os botões de exportação.</p>
+<div class="shot">
+  <img src="ui-crop.png">
+  <span class="b" style="left:2.4%;top:9.4%">1</span>
+  <span class="b" style="left:2.4%;top:20.7%">2</span>
+  <span class="b" style="left:6.4%;top:46%">3</span>
+  <span class="b" style="left:48%;top:39%">4</span>
+  <span class="b" style="left:48%;top:95.3%">5</span>
+</div>
+<div class="legend">
+  <span><b>1</b> Configurações gerais (projeto, formato, logo)</span>
+  <span><b>2</b> Sequência de slides</span>
+  <span><b>3</b> Preview do slide</span>
+  <span><b>4</b> Painel de edição do slide</span>
+  <span><b>5</b> Exportação</span>
+</div>
+
+<h2 class="pb">2. Passo a passo rápido</h2>
+<ol class="steps">
+  <li><b>Configure o carrossel</b> no topo: nome do projeto, formato, quantidade de slides, perfil (@) e cor de destaque.</li>
+  <li><b>Escolha um slide</b> na Sequência e escreva o <b>rótulo</b>, o <b>título</b> e o <b>texto</b>, respeitando os limites de caracteres (seção 5).</li>
+  <li><b>Defina o fundo</b> do slide: cor sólida, gradiente, imagem (de 1 a 4 fotos) ou vídeo.</li>
+  <li><b>Repita</b> para os demais slides. Arraste as miniaturas para reordenar.</li>
+  <li><b>Exporte</b>: um slide só, ou o carrossel inteiro em um arquivo .zip.</li>
+</ol>
+<div class="note">O trabalho é salvo sozinho no navegador (aparece “salvo às HH:MM” embaixo do nome do projeto). Se fechar a página, ao voltar você continua de onde parou.</div>
+
+<h2>3. Configurações gerais (barra superior)</h2>
+<table>
+  <tr><th>Campo</th><th>O que faz</th></tr>
+  <tr><td>Projeto</td><td>Nome do carrossel. É usado no nome dos arquivos exportados.</td></tr>
+  <tr><td>Formato</td><td><b>4:5</b> (1080 × 1350 px, retrato — padrão do feed) ou <b>1:1</b> (1080 × 1080 px, quadrado).</td></tr>
+  <tr><td>Slides</td><td>Quantidade de slides, de 2 a 20. Reduzir a quantidade remove slides do final.</td></tr>
+  <tr><td>Perfil</td><td>O @ que aparece no rodapé de cada slide.</td></tr>
+  <tr><td>Destaque</td><td>Cor de destaque da marca (rótulos, numeração).</td></tr>
+  <tr><td>Logo</td><td><b>Nenhum</b>, <b>Automático</b> (usa o logo branco em fundos escuros e o preto em fundos claros), ou logo <b>preto</b>/<b>branco</b> fixo.</td></tr>
+  <tr><td>Posição do logo</td><td>Esquerda, centro ou direita, no topo do slide.</td></tr>
+  <tr><td>exibir logo / exibir @ / numeração</td><td>Liga ou desliga, em todos os slides, o logo, o @ do rodapé e a numeração (01/05). O alinhamento do texto não muda ao ligar ou desligar o @ e a numeração.</td></tr>
+  <tr><td>Interruptor sol/lua</td><td>Alterna entre o modo claro e o escuro da ferramenta (não muda os slides). A escolha fica salva.</td></tr>
+  <tr><td>Novo carrossel</td><td>Apaga o rascunho salvo e recomeça a partir do exemplo. A ferramenta pede confirmação antes.</td></tr>
+</table>
+
+<h2 class="pb">4. Sequência de slides</h2>
+<ul>
+  <li><b>Selecionar:</b> clique na miniatura. O slide selecionado aparece no preview e no painel de edição.</li>
+  <li><b>Reordenar:</b> <b>arraste</b> a miniatura e solte sobre outra. Uma barra colorida mostra se o slide entra antes ou depois. Também dá para usar as setas <span class="k">▲</span> <span class="k">▼</span> da miniatura.</li>
+  <li><b>Duplicar</b> <span class="k">⧉</span> e <b>excluir</b> <span class="k">✕</span>: botões na miniatura do slide selecionado (ou ao passar o mouse). É preciso manter no mínimo 2 slides.</li>
+  <li><b>Novo slide:</b> botão <span class="k">+ novo slide</span> à direita (máximo de 20).</li>
+  <li><b>Navegar:</b> setas <span class="k">‹</span> <span class="k">›</span> ao lado do preview ou os pontinhos abaixo dele.</li>
+  <li>O primeiro slide é a <b>capa</b>, o último é o <b>fechamento</b>; os do meio são de <b>conteúdo</b>. A etiqueta no canto do painel mostra o papel do slide. <b>Os limites de texto e de tamanho de fonte mudam conforme esse papel.</b></li>
+</ul>
+
+<h2>5. Editando um slide</h2>
+<table>
+  <tr><th>Campo</th><th>O que faz</th></tr>
+  <tr><td>logo neste slide</td><td>Mostra ou esconde o logo <b>só neste slide</b> (ex.: logo apenas na capa). Precisa de “exibir logo” ligado no topo.</td></tr>
+  <tr><td>Alinhamento vertical / horizontal</td><td>Posição do bloco de texto: topo, centro ou base; esquerda ou centro.</td></tr>
+  <tr><td>Rótulo (opcional)</td><td>Linha curta em letras maiúsculas acima do título (ex.: “SALVE PARA DEPOIS”). O quadrado de cor ao lado muda a cor do texto do rótulo.</td></tr>
+  <tr><td>Fundo do rótulo</td><td>Marque para colocar uma <b>caixa colorida atrás do rótulo</b>, do tamanho exato do texto. Escolha a cor da caixa no seletor que aparece ao lado.</td></tr>
+  <tr><td>Título e Texto</td><td>Texto principal e texto de apoio, cada um com controle de tamanho (<span class="k">padrão</span> volta ao original). “Cor do texto”, mais abaixo, vale para os dois.</td></tr>
+</table>
+<h3>Limites de texto</h3>
+<p>Cada campo tem um contador (ex.: “44 / 60”) que fica na cor de destaque ao passar do limite — é só um aviso. O que passar das linhas permitidas é cortado com “…”; antes disso a fonte diminui sozinha, até o menor tamanho da faixa.</p>
+<table class="lim">
+  <tr><th></th><th>Capa e fechamento</th><th>Conteúdo</th></tr>
+  <tr><td>Rótulo</td><td>40 caracteres · 1 linha</td><td>40 caracteres · 1 linha</td></tr>
+  <tr><td>Título</td><td>60 caracteres · até 3 linhas</td><td>45 caracteres · até 2 linhas</td></tr>
+  <tr><td>Texto</td><td>200 caracteres · até 3 linhas</td><td>250 caracteres · até 5 linhas</td></tr>
+  <tr><td>Tamanho do título</td><td>82 a 135 px</td><td>80 a 100 px</td></tr>
+  <tr><td>Tamanho do texto</td><td>35 a 42 px</td><td>35 a 42 px</td></tr>
+</table>
+
+<h2 class="pb">6. Fundo do slide</h2>
+<p>Em <b>Fundo → Tipo</b> escolha uma das quatro opções. Cada slide tem o seu próprio fundo.</p>
+<table>
+  <tr><th>Tipo</th><th>Como usar</th></tr>
+  <tr><td>Sólido</td><td>Uma cor (Cor 1).</td></tr>
+  <tr><td>Gradiente</td><td>Degradê na diagonal entre duas cores (Cor 1 e Cor 2).</td></tr>
+  <tr><td>Imagem</td><td>Uma ou mais fotos. Veja a seção abaixo.</td></tr>
+  <tr><td>Vídeo</td><td>Vídeo como fundo. Veja a seção 7.</td></tr>
+</table>
+
+<h3>Imagem de fundo</h3>
+<ul>
+  <li><b>Enviar:</b> clique na caixa <i>“Clique para enviar ou arraste e solte”</i> ou arraste arquivos do computador para dentro dela. Dá para enviar várias imagens de uma vez. As imagens são reduzidas e comprimidas automaticamente, então não é preciso otimizá-las antes.</li>
+  <li><b>Banco de imagens:</b> as imagens enviadas aparecem como miniaturas abaixo da caixa. <b>Clique</b> em uma para usá-la no slide; o <span class="k">✕</span> remove a imagem do banco. O mesmo banco vale para todos os slides.</li>
+  <li><b>Layout de fotos</b> (ao lado do Tipo): <b>1 foto</b> (tela cheia), <b>2 fotos</b> (uma em cima, outra embaixo), <b>3 fotos</b> (1 em cima e 2 embaixo) ou <b>4 fotos</b> (2 linhas × 2 colunas).</li>
+  <li><b>Escolher a foto a editar:</b> nos layouts com várias fotos, use os botões <span class="k">Foto 1</span>, <span class="k">Foto 2</span>… ou clique diretamente na foto no preview (a ativa aparece com borda tracejada, que não vai para a exportação). Clicar numa imagem do banco coloca a imagem na foto ativa; enviar várias de uma vez preenche as fotos em sequência.</li>
+  <li><b>Zoom</b> (100% a 300%), <b>Rotação</b> (−180° a +180°) e <b>arrastar no preview</b> para reposicionar: valem para a foto ativa. A imagem se ajusta sozinha para nunca deixar cantos vazios ao girar.</li>
+  <li><b>redefinir:</b> volta zoom, rotação e posição da foto ativa ao padrão.</li>
+  <li><b>Opacidade do preto sobre o fundo:</b> escurece a imagem (padrão 40%) para o texto ficar legível.</li>
+</ul>
+<div class="note">Ao escolher <b>Imagem</b> no menu Tipo, o layout sempre começa em <b>1 foto</b>.</div>
+
+<h2>7. Vídeo de fundo</h2>
+<ul>
+  <li>Envie o vídeo pela caixa <i>“Clique para enviar ou arraste e solte”</i> (um arquivo por slide). Zoom, rotação, reposicionamento e opacidade funcionam como nas imagens.</li>
+  <li>O <b>áudio original</b> do vídeo é mantido na exportação.</li>
+  <li>A exportação de vídeo é limitada a <b>60 segundos</b>. Se o vídeo for maior, a ferramenta avisa que será cortado.</li>
+  <li>O vídeo sai em <b>MP4</b>. A conversão é feita pelo <b>servidor de conversão</b> (campo já preenchido). Se esse campo for deixado vazio, a conversão acontece no próprio navegador — funciona, porém é mais lenta.</li>
+  <li><b>Atenção:</b> os arquivos de vídeo <u>não ficam salvos</u> no rascunho (são grandes demais). Se você fechar a página, será preciso enviar o vídeo novamente.</li>
+</ul>
+
+<h2 class="pb">8. Exportando</h2>
+<table>
+  <tr><th>Botão</th><th>Resultado</th></tr>
+  <tr><td>Exportar este slide</td><td>Baixa o slide selecionado: <b>PNG</b> (1080 × 1350 ou 1080 × 1080) ou <b>MP4</b> se o fundo for vídeo.</td></tr>
+  <tr><td>Exportar carrossel em .zip</td><td>Baixa todos os slides em um único arquivo .zip, numerados na ordem da sequência (ex.: <code>meu-projeto-01.png</code>). Slides com vídeo saem em MP4.</td></tr>
+</table>
+<p>A linha ao lado dos botões mostra o formato e o tamanho do arquivo. Durante a exportação de vídeos aparece o andamento; aguarde terminar antes de fechar a página. Depois é só postar os arquivos no Instagram.</p>
+
+<h2>9. Rascunho, salvamento e limites</h2>
+<ul>
+  <li>O rascunho é salvo <b>automaticamente neste navegador e neste computador</b>. Ele não vai para a nuvem e não aparece em outro computador ou outro navegador.</li>
+  <li>Limpar os dados do navegador (cookies/armazenamento do site) <b>apaga o rascunho</b>. Exporte o carrossel antes de fazer isso.</li>
+  <li>Se aparecer “não foi possível salvar (armazenamento cheio)”, remova imagens do banco que não usa mais ou exporte o carrossel e comece um novo.</li>
+  <li>Limites: 2 a 20 slides por carrossel; vídeos de até 60 s na exportação.</li>
+</ul>
+
+<h2 class="pb">10. Perguntas frequentes</h2>
+<table>
+  <tr><th>Problema</th><th>Solução</th></tr>
+  <tr><td>O logo não aparece em um slide.</td><td>Confira “exibir logo” no topo, “logo neste slide” no painel e se o menu Logo não está em “Nenhum”.</td></tr>
+  <tr><td>O texto ficou cortado com “…”.</td><td>Ele passou do limite de linhas do slide. Veja o contador ao lado do campo e encurte o título ou o texto.</td></tr>
+  <tr><td>O texto ficou pequeno.</td><td>Quando não cabe, a fonte diminui sozinha até o menor tamanho da faixa (seção 5). Encurte o texto para ele voltar ao tamanho escolhido.</td></tr>
+  <tr><td>O texto está difícil de ler sobre a foto.</td><td>Aumente a “Opacidade do preto sobre o fundo” ou mude a cor do texto.</td></tr>
+  <tr><td>Quero o logo só na capa.</td><td>Desmarque “logo neste slide” nos demais slides.</td></tr>
+  <tr><td>O vídeo sumiu ao reabrir a página.</td><td>Vídeos não ficam no rascunho. Envie o arquivo novamente.</td></tr>
+  <tr><td>Não consigo arrastar os slides no celular.</td><td>O arrastar não funciona por toque; use as setas ▲ ▼ das miniaturas.</td></tr>
+  <tr><td>Quero recomeçar do zero.</td><td>Clique em “Novo carrossel” (canto superior direito) e confirme.</td></tr>
+</table>
+
+<footer class="end">PostSBR v2.2 · Manual de uso · carrossel.sneakersbr.co</footer>
+</body>
+</html>

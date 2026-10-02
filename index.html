@@ -1021,7 +1021,7 @@
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
       weight:"900", family:"Roboto", variation:'"wdth" 87.5', maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
-      startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.12,
+      startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.05,
       maxLines: rules.headline.lines
     });
     const headlineH = headlineFit.lines.length * headlineFit.lineHeight;

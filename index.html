@@ -202,6 +202,9 @@
     font-family:'IBM Plex Mono'; font-size:9.5px; color:var(--ink-soft); }
   .site-footer a{ color:var(--ink-soft); text-decoration:none; border-bottom:1px solid var(--line); }
   .site-footer a:hover, .site-footer a:focus-visible{ color:var(--accent); border-bottom-color:var(--accent); }
+  .label-row{ display:flex; justify-content:space-between; align-items:baseline; gap:8px; }
+  .char-count{ font-family:'IBM Plex Mono'; font-size:10.5px; color:var(--ink-soft); }
+  .char-count.over{ color:var(--accent); font-weight:600; }
   .export-note{ font-family:'IBM Plex Mono'; font-size:11px; color:var(--ink-soft); }
 
   .toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(16px);
@@ -367,7 +370,7 @@
         </div>
 
         <div class="field">
-          <label for="eyebrowInput">Rótulo (opcional)</label>
+          <div class="label-row"><label for="eyebrowInput">Rótulo (opcional)</label><span class="char-count" id="eyebrowCount"></span></div>
           <div style="display:flex; gap:8px; align-items:center;">
             <input type="text" id="eyebrowInput" placeholder="Ex.: SALVE PARA DEPOIS" style="flex:1;">
             <input type="color" id="eyebrowColorInput" title="Cor do texto do rótulo" value="#ff4b2e">
@@ -378,7 +381,7 @@
           </div>
         </div>
         <div class="field">
-          <label for="headlineInput">Título</label>
+          <div class="label-row"><label for="headlineInput">Título</label><span class="char-count" id="headlineCount"></span></div>
           <textarea id="headlineInput" rows="2"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
             <input type="range" id="headlineSize" min="80" max="140" step="1" value="84" style="flex:1;">
@@ -387,7 +390,7 @@
           </div>
         </div>
         <div class="field">
-          <label for="bodyInput">Texto</label>
+          <div class="label-row"><label for="bodyInput">Texto</label><span class="char-count" id="bodyCount"></span></div>
           <textarea id="bodyInput" rows="3"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
             <input type="range" id="bodySize" min="30" max="45" step="1" value="30" style="flex:1;">
@@ -1390,6 +1393,21 @@
     buildFilmstrip(); syncEditor(); renderMain(); scheduleSave();
   }
 
+  // character limits per slide type (capa/fechamento vs conteúdo). Warning only — typing is never blocked.
+  const CHAR_LIMITS = {
+    cover:   { eyebrow: 40, headline: 70, body: 160 },
+    content: { eyebrow: 40, headline: 45, body: 220 }
+  };
+  function updateCharCounts(){
+    const s = selectedSlide(), i = selectedIndex();
+    const lim = CHAR_LIMITS[(i === 0 || i === state.slides.length-1) ? "cover" : "content"];
+    [["eyebrow", s.eyebrow], ["headline", s.headline], ["body", s.body]].forEach(([k, v]) => {
+      const n = (v || "").length, el = $(k + "Count");
+      el.textContent = n + " / " + lim[k];
+      el.classList.toggle("over", n > lim[k]);
+    });
+  }
+
   function roleLabel(i,total){
     if (i===0) return "capa";
     if (i===total-1) return "fechamento";
@@ -1401,6 +1419,7 @@
     const i = selectedIndex();
     $("editorTitle").textContent = "Slide " + (i+1);
     $("roleTag").textContent = roleLabel(i, state.slides.length);
+    updateCharCounts();
     $("slideShowLogo").checked = s.showLogo !== false;
     $("valignSel").value = s.valign;
     $("halignSel").value = s.halign;
@@ -1464,7 +1483,7 @@
   bindField("slideShowLogo","change", e => { selectedSlide().showLogo = e.target.checked; scheduleRender(); });
   bindField("valignSel","change", e => { selectedSlide().valign = e.target.value; scheduleRender(); });
   bindField("halignSel","change", e => { selectedSlide().halign = e.target.value; scheduleRender(); });
-  bindField("eyebrowInput","input", e => { selectedSlide().eyebrow = e.target.value; scheduleRender(); });
+  bindField("eyebrowInput","input", e => { selectedSlide().eyebrow = e.target.value; updateCharCounts(); scheduleRender(); });
   bindField("eyebrowBgOn","change", e => {
     const s = selectedSlide();
     s.eyebrowBg = e.target.checked;
@@ -1482,8 +1501,8 @@
   });
   bindField("eyebrowBgColor","input", e => { selectedSlide().eyebrowBgColor = e.target.value; scheduleRender(); });
   bindField("eyebrowColorInput","input", e => { selectedSlide().eyebrowColor = e.target.value; scheduleRender(); });
-  bindField("headlineInput","input", e => { selectedSlide().headline = e.target.value; scheduleRender(); });
-  bindField("bodyInput","input", e => { selectedSlide().body = e.target.value; scheduleRender(); });
+  bindField("headlineInput","input", e => { selectedSlide().headline = e.target.value; updateCharCounts(); scheduleRender(); });
+  bindField("bodyInput","input", e => { selectedSlide().body = e.target.value; updateCharCounts(); scheduleRender(); });
   bindField("headlineSize","input", e => {
     selectedSlide().headlineSize = Number(e.target.value);
     $("headlineSizeValue").textContent = e.target.value + "px";

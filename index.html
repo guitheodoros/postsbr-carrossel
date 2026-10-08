@@ -1204,7 +1204,8 @@
     return v;
   }
 
-  // taps the original file's audio via Web Audio (works even though the preview element is muted)
+  // taps the original file's audio via Web Audio (the element must be unmuted while recording: Chrome
+  // feeds silence to the graph from a muted element; it still isn't heard, since nothing reaches the speakers)
   // — cached on the element itself because createMediaElementSource can only be called once per element
   function getVideoAudioStream(videoEl){
     if (videoEl._audioDest) return videoEl._audioDest.stream;
@@ -1992,6 +1993,11 @@
 
     const canvasStream = exportCanvas.captureStream(30);
     const audioStream = getVideoAudioStream(videoEl);
+    const wasMuted = videoEl.muted;
+    if (audioStream){
+      videoEl.muted = false;
+      await videoEl._audioCtx.resume().catch(()=>{});
+    }
     const tracks = canvasStream.getVideoTracks().slice();
     if (audioStream) tracks.push(...audioStream.getAudioTracks());
     const stream = new MediaStream(tracks);
@@ -2025,6 +2031,7 @@
     }, 33);
     await stopped;
 
+    videoEl.muted = wasMuted;
     videoEl.loop = wasLoop;
     videoEl.currentTime = wasTime;
     if (wasLoop) videoEl.play().catch(()=>{});
@@ -2036,7 +2043,7 @@
     const { fetchFile } = FFmpegUtil;
     const ffmpeg = await getFFmpeg();
     await ffmpeg.writeFile("input.webm", await fetchFile(webmBlob));
-    await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "output.mp4"]);
+    await ffmpeg.exec(["-i", "input.webm", "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p", "-r", "30", "-fps_mode", "cfr", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "output.mp4"]);
     const data = await ffmpeg.readFile("output.mp4");
     try { await ffmpeg.deleteFile("input.webm"); await ffmpeg.deleteFile("output.mp4"); } catch(e){}
     return new Blob([data.buffer], { type: "video/mp4" });

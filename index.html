@@ -407,6 +407,7 @@
             <select id="bgType">
               <option value="solid">Sólido</option>
               <option value="gradient">Gradiente</option>
+              <option value="transparent">Transparente</option>
               <option value="image">Imagem</option>
               <option value="video">Vídeo</option>
             </select>
@@ -643,6 +644,8 @@
     return 0.2126*r + 0.7152*g + 0.0722*b;
   }
   function isDarkBg(s){
+    // transparent: whatever sits behind is unknown, so follow the text (light text = meant for a dark backdrop)
+    if (s.bg.type === "transparent") return relLuminance(s.textColor) > 0.5;
     if (s.bg.type === "image"){
       const overlay = (s.bg.imageOverlay != null ? s.bg.imageOverlay : 40) / 100;
       return overlay >= 0.35;
@@ -932,6 +935,15 @@
       const g = ctx.createLinearGradient(0,0,W,H);
       g.addColorStop(0, s.bg.color1); g.addColorStop(1, s.bg.color2);
       ctx.fillStyle = g; ctx.fillRect(0,0,W,H);
+    } else if (s.bg.type === "transparent"){
+      // nothing is painted, so the PNG keeps its alpha; preview and thumbnails show a checkerboard (never exports)
+      if (ctx.canvas !== exportCanvas){
+        const sq = Math.round(W/36);
+        ctx.fillStyle = "#a3a3a3"; ctx.fillRect(0,0,W,H);
+        ctx.fillStyle = "#8c8c8c";
+        for (let y=0, row=0; y<H; y+=sq, row++)
+          for (let x=(row%2)*sq; x<W; x+=sq*2) ctx.fillRect(x, y, sq, sq);
+      }
     } else if (s.bg.type === "image" || s.bg.type === "video"){
       ctx.fillStyle = s.bg.color1; ctx.fillRect(0,0,W,H);
       const isVideo = s.bg.type === "video";
@@ -1457,7 +1469,7 @@
     $("serverUrlField").style.display = isVideo ? "flex" : "none";
     $("overlayField").style.display = (isImage || isVideo) ? "flex" : "none";
     $("cropField").style.display = (isImage || isVideo) ? "flex" : "none";
-    $("color1Field").style.display = (isImage || isVideo) ? "none" : "flex";
+    $("color1Field").style.display = (isImage || isVideo || s.bg.type === "transparent") ? "none" : "flex";
     $("videoStatus").textContent = videoStatusLabel(s.bg);
     const overlay = s.bg.imageOverlay != null ? s.bg.imageOverlay : 40;
     $("bgOverlay").value = overlay;
@@ -1556,7 +1568,7 @@
     $("serverUrlField").style.display = isVideo ? "flex" : "none";
     $("overlayField").style.display = (isImage || isVideo) ? "flex" : "none";
     $("cropField").style.display = (isImage || isVideo) ? "flex" : "none";
-    $("color1Field").style.display = (isImage || isVideo) ? "none" : "flex";
+    $("color1Field").style.display = (isImage || isVideo || e.target.value === "transparent") ? "none" : "flex";
     updateCropAffordance(s);
     syncVideoPlayback();
     updateExportLabels();

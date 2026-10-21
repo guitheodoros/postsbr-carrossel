@@ -12,7 +12,7 @@
   } catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,500;87.5,900;100,400&family=Instrument+Serif:ital@1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,500;87.5,700;87.5,900;100,200;100,300;100,400&family=Instrument+Serif:ital@1&display=swap">
 <style>
   :root{
     color-scheme: light dark;
@@ -384,24 +384,27 @@
           <div class="label-row"><label for="headlineInput">Título</label><span class="char-count" id="headlineCount"></span></div>
           <textarea id="headlineInput" rows="2"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
-            <input type="range" id="headlineSize" min="80" max="135" step="1" value="84" style="flex:1;">
+            <input type="range" id="headlineSize" min="80" max="135" step="1" value="84" style="flex:1; min-width:40px;">
             <span class="export-note" id="headlineSizeValue" style="min-width:34px;">84px</span>
-            <button class="btn" id="resetHeadlineSize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
-          </div>
-          <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
-            <label for="headlineWeight" style="margin:0;">Peso do título</label>
-            <select id="headlineWeight" style="flex:1;">
+            <select id="headlineWeight" title="Peso do título" aria-label="Peso do título" style="flex:0 1 160px; min-width:0; padding:6px 8px; font-size:12px;">
               <option value="900">900 · Black (padrão)</option>
+              <option value="700">700 · Bold</option>
               <option value="500">500 · Medium</option>
             </select>
+            <button class="btn" id="resetHeadlineSize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
           </div>
         </div>
         <div class="field">
           <div class="label-row"><label for="bodyInput">Texto</label><span class="char-count" id="bodyCount"></span></div>
           <textarea id="bodyInput" rows="3"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
-            <input type="range" id="bodySize" min="35" max="42" step="1" value="35" style="flex:1;">
+            <input type="range" id="bodySize" min="35" max="42" step="1" value="35" style="flex:1; min-width:40px;">
             <span class="export-note" id="bodySizeValue" style="min-width:34px;">35px</span>
+            <select id="bodyWeight" title="Peso do texto" aria-label="Peso do texto" style="flex:0 1 160px; min-width:0; padding:6px 8px; font-size:12px;">
+              <option value="400">400 · Regular (padrão)</option>
+              <option value="300">300 · Light</option>
+              <option value="200">200 · Extralight</option>
+            </select>
             <button class="btn" id="resetBodySize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
           </div>
         </div>
@@ -721,6 +724,7 @@
       headlineSize: 84,
       headlineWeight: 900,
       bodySize: 35,
+      bodyWeight: 400,
       valign: "center",
       halign: "left",
       textColor: "#ffffff",
@@ -774,7 +778,7 @@
       mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, eyebrowBg: !!s.eyebrowBg, eyebrowBgColor: s.eyebrowBgColor, headline: s.headline, body: s.body,
-        headlineSize: s.headlineSize, headlineWeight: s.headlineWeight, bodySize: s.bodySize,
+        headlineSize: s.headlineSize, headlineWeight: s.headlineWeight, bodySize: s.bodySize, bodyWeight: s.bodyWeight,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
         bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
           layout: s.bg.layout || "single",
@@ -921,6 +925,8 @@
       if ((fitsHeight && fitsLines) || size <= minSize) break;
       size -= 2;
     }
+    const total = lines.length;
+    const over = (maxLines && total > maxLines) || total * lineHeight > maxHeight;
     if (maxLines && lines.length > maxLines){
       lines = lines.slice(0, maxLines);
       let last = lines[maxLines-1];
@@ -929,7 +935,7 @@
       }
       lines[maxLines-1] = last.replace(/\s+$/,"") + "…";
     }
-    return { size, lines, lineHeight };
+    return { size, lines, lineHeight, total, over };
   }
 
   function drawSlide(ctx, s, brand, W, H, index, total){
@@ -1036,7 +1042,7 @@
 
     const headlineBudget = boxHeight*0.62 - eyebrowH;
     const rules = sizeRules(index, total);
-    const headlineWeight = String(s.headlineWeight === 500 ? 500 : 900);
+    const headlineWeight = String([500, 700].includes(s.headlineWeight) ? s.headlineWeight : 900);
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
       weight:headlineWeight, family:"Roboto", stretch:"semi-condensed", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
@@ -1047,13 +1053,20 @@
 
     const usedSoFar = eyebrowH + (eyebrowH?gap:0) + headlineH + gap;
     const bodyBudget = Math.max(boxHeight - usedSoFar, W*0.05);
+    const bodyWeight = String([200, 300].includes(s.bodyWeight) ? s.bodyWeight : 400);
     const bodyStartSize = Math.round(clampSize(s.bodySize, rules.body) * (W/1080));
     const bodyFit = wrapAndFit(ctx, s.body, {
-      weight:"400", family:"Roboto", stretch:"normal", maxWidth:boxWidth, maxHeight:bodyBudget,
+      weight:bodyWeight, family:"Roboto", stretch:"normal", maxWidth:boxWidth, maxHeight:bodyBudget,
       startSize:bodyStartSize, minSize:Math.round(rules.body.min * (W/1080)), lineHeightRatio:1.30,
       maxLines: rules.body.lines
     });
     const bodyH = s.body ? bodyFit.lines.length * bodyFit.lineHeight : 0;
+    // real measurement behind the editor counters (live preview only)
+    if (ctx.canvas === mainCanvas){
+      const info = (text, fit, rule, start) => ({ n: text ? fit.total : 0, max: rule.lines, size: fit.size, start, over: !!text && fit.over });
+      s._fit = { headline: info(s.headline, headlineFit, rules.headline, headlineStartSize),
+                 body: info(s.body, bodyFit, rules.body, bodyStartSize) };
+    }
 
     const totalH = eyebrowH + (eyebrowH?gap:0) + headlineH + (bodyH?gap:0) + bodyH;
     let y = contentTop;
@@ -1107,7 +1120,7 @@
     if (s.body){
       y += gap;
       ctx.fillStyle = s.textColor;
-      drawLines(bodyFit.lines, "400 " + bodyFit.size + "px 'Roboto'", bodyFit.lineHeight, "normal");
+      drawLines(bodyFit.lines, bodyWeight + " " + bodyFit.size + "px 'Roboto'", bodyFit.lineHeight, "normal");
     }
 
     // watermark + page pill share one vertically-centered footer line
@@ -1174,6 +1187,7 @@
     const ctx = mainCanvas.getContext("2d");
     const idx = selectedIndex();
     drawSlide(ctx, selectedSlide(), state.brand, W, H, idx, state.slides.length);
+    updateCharCounts();
     $("dimsReadout").textContent = W + " × " + H + " · slide " + (idx+1) + "/" + state.slides.length;
   }
 
@@ -1415,13 +1429,13 @@
 
   // character limits per slide type (capa/fechamento vs conteúdo). Warning only — typing is never blocked.
   const CHAR_LIMITS = {
-    cover:   { eyebrow: 40, headline: 60, body: 150 },
+    cover:   { eyebrow: 40, headline: 60, body: 250 },
     content: { eyebrow: 40, headline: 45, body: 250 }
   };
   // font-size range (px at 1080 wide), default and max lines per slide type.
   // min is also the floor the auto-fit may shrink to; max is the slider's upper end.
   const SIZE_RULES = {
-    cover:   { headline: { min:82, max:135, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:3 } },
+    cover:   { headline: { min:82, max:135, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:5 } },
     content: { headline: { min:80, max:100, def:84, lines:2 }, body: { min:35, max:42, def:35, lines:5 } }
   };
   function sizeRules(i, total){ return SIZE_RULES[(i === 0 || i === total-1) ? "cover" : "content"]; }
@@ -1429,10 +1443,17 @@
   function updateCharCounts(){
     const s = selectedSlide(), i = selectedIndex();
     const lim = CHAR_LIMITS[(i === 0 || i === state.slides.length-1) ? "cover" : "content"];
-    [["eyebrow", s.eyebrow], ["headline", s.headline], ["body", s.body]].forEach(([k, v]) => {
-      const n = (v || "").length, el = $(k + "Count");
-      el.textContent = n + " / " + lim[k];
-      el.classList.toggle("over", n > lim[k]);
+    const eb = (s.eyebrow || "").length, ebEl = $("eyebrowCount");
+    ebEl.textContent = eb + " / " + lim.eyebrow + " letras";
+    ebEl.classList.toggle("over", eb > lim.eyebrow);
+    // título e texto: medida real (linhas no canvas, depois do ajuste automático de fonte)
+    ["headline", "body"].forEach(k => {
+      const f = s._fit && s._fit[k], el = $(k + "Count");
+      if (!f){ el.textContent = ""; el.classList.remove("over"); return; }
+      const shrunk = f.n && f.size < f.start ? " · fonte " + f.size + "px" : "";
+      el.textContent = f.n + " / " + f.max + " linhas" + shrunk;
+      el.title = f.over ? "O texto não cabe e será cortado com “…”. Encurte-o." : "";
+      el.classList.toggle("over", f.over);
     });
   }
 
@@ -1465,9 +1486,10 @@
     const bodySize = clampSize(s.bodySize, rules.body);
     $("headlineSize").value = headlineSize;
     $("headlineSizeValue").textContent = headlineSize + "px";
-    $("headlineWeight").value = s.headlineWeight === 500 ? "500" : "900";
+    $("headlineWeight").value = [500, 700].includes(s.headlineWeight) ? String(s.headlineWeight) : "900";
     $("bodySize").value = bodySize;
     $("bodySizeValue").textContent = bodySize + "px";
+    $("bodyWeight").value = [200, 300].includes(s.bodyWeight) ? String(s.bodyWeight) : "400";
     $("bgType").value = s.bg.type;
     $("bgColor1").value = s.bg.color1;
     $("bgColor2").value = s.bg.color2;
@@ -1542,6 +1564,10 @@
   });
   bindField("headlineWeight","change", e => {
     selectedSlide().headlineWeight = Number(e.target.value);
+    scheduleRender();
+  });
+  bindField("bodyWeight","change", e => {
+    selectedSlide().bodyWeight = Number(e.target.value);
     scheduleRender();
   });
   bindField("bodySize","input", e => {
@@ -2198,8 +2224,11 @@
       document.fonts.load("500 16px 'IBM Plex Mono'");
       document.fonts.load("700 40px 'Geist'");
       document.fonts.load("900 semi-condensed 40px 'Roboto'");
+      document.fonts.load("700 semi-condensed 40px 'Roboto'");
       document.fonts.load("500 semi-condensed 40px 'Roboto'");
       document.fonts.load("400 20px 'Roboto'");
+      document.fonts.load("300 20px 'Roboto'");
+      document.fonts.load("200 20px 'Roboto'");
       document.fonts.load("italic 400 30px 'Instrument Serif'");
       document.fonts.ready.then(() => { buildFilmstrip(); renderMain(); });
     }

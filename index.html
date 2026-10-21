@@ -889,12 +889,12 @@
   function selectedSlide(){ return state.slides[selectedIndex()]; }
 
   function wrapAndFit(ctx, text, opts){
-    const { weight, family, maxWidth, maxHeight, startSize, minSize, lineHeightRatio, variation, maxLines } = opts;
+    const { weight, family, maxWidth, maxHeight, startSize, minSize, lineHeightRatio, stretch, maxLines } = opts;
     const paragraphs = String(text || "").split("\n");
     let size = startSize, lines = [], lineHeight = 0;
     while (size >= minSize){
       ctx.font = weight + " " + size + "px '" + family + "'";
-      try { ctx.fontVariationSettings = variation || "normal"; } catch(e){}
+      try { ctx.fontStretch = stretch || "normal"; } catch(e){}
       lines = [];
       for (const p of paragraphs){
         if (p === ""){ lines.push(""); continue; }
@@ -1030,7 +1030,7 @@
     const rules = sizeRules(index, total);
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
-      weight:"900", family:"Roboto", variation:'"wdth" 87.5', maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
+      weight:"900", family:"Roboto", stretch:"semi-condensed", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
       startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.05,
       maxLines: rules.headline.lines
     });
@@ -1040,7 +1040,7 @@
     const bodyBudget = Math.max(boxHeight - usedSoFar, W*0.05);
     const bodyStartSize = Math.round(clampSize(s.bodySize, rules.body) * (W/1080));
     const bodyFit = wrapAndFit(ctx, s.body, {
-      weight:"400", family:"Roboto", variation:'"wdth" 100', maxWidth:boxWidth, maxHeight:bodyBudget,
+      weight:"400", family:"Roboto", stretch:"normal", maxWidth:boxWidth, maxHeight:bodyBudget,
       startSize:bodyStartSize, minSize:Math.round(rules.body.min * (W/1080)), lineHeightRatio:1.30,
       maxLines: rules.body.lines
     });
@@ -1051,9 +1051,9 @@
     if (s.valign === "center") y = contentTop + Math.max(0,(boxHeight-totalH)/2);
     else if (s.valign === "bottom") y = contentBottom - totalH;
 
-    function drawLines(lines, font, lineHeight, variation){
+    function drawLines(lines, font, lineHeight, stretch){
       ctx.font = font;
-      try { ctx.fontVariationSettings = variation || "normal"; } catch(e){}
+      try { ctx.fontStretch = stretch || "normal"; } catch(e){}
       for (const line of lines){
         let x = boxLeft;
         if (s.halign === "center"){
@@ -1069,7 +1069,7 @@
       // label on a pill that hugs the text width
       const label = s.eyebrow.toUpperCase();
       ctx.font = "700 " + eyebrowSize + "px 'Geist'";
-      try { ctx.fontVariationSettings = "normal"; } catch(e){}
+      try { ctx.fontStretch = "normal"; } catch(e){}
       try { ctx.letterSpacing = "0.14em"; } catch(e){}
       const m = ctx.measureText(label);
       const textW = m.width - eyebrowSize*0.14; // drop the trailing letter-spacing
@@ -1094,11 +1094,11 @@
       y += gap - eyebrowH*0.3;
     }
     ctx.fillStyle = s.textColor;
-    drawLines(headlineFit.lines, "900 " + headlineFit.size + "px 'Roboto'", headlineFit.lineHeight, '"wdth" 87.5');
+    drawLines(headlineFit.lines, "900 " + headlineFit.size + "px 'Roboto'", headlineFit.lineHeight, "semi-condensed");
     if (s.body){
       y += gap;
       ctx.fillStyle = s.textColor;
-      drawLines(bodyFit.lines, "400 " + bodyFit.size + "px 'Roboto'", bodyFit.lineHeight, '"wdth" 100');
+      drawLines(bodyFit.lines, "400 " + bodyFit.size + "px 'Roboto'", bodyFit.lineHeight, "normal");
     }
 
     // watermark + page pill share one vertically-centered footer line
@@ -1122,7 +1122,7 @@
         ctx.globalAlpha = 0.9;
         ctx.fillStyle = s.textColor;
         ctx.font = "italic 400 " + hs + "px 'Instrument Serif'";
-        try { ctx.fontVariationSettings = "normal"; } catch(e){}
+        try { ctx.fontStretch = "normal"; } catch(e){}
         ctx.fillText(brand.handle, boxLeft, footerCenterY - hs/2);
         ctx.globalAlpha = 1;
       }
@@ -2183,7 +2183,7 @@
       document.fonts.load("400 20px 'IBM Plex Sans'");
       document.fonts.load("500 16px 'IBM Plex Mono'");
       document.fonts.load("700 40px 'Geist'");
-      document.fonts.load("900 40px 'Roboto'");
+      document.fonts.load("900 semi-condensed 40px 'Roboto'");
       document.fonts.load("400 20px 'Roboto'");
       document.fonts.load("italic 400 30px 'Instrument Serif'");
       document.fonts.ready.then(() => { buildFilmstrip(); renderMain(); });

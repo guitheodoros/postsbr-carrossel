@@ -575,9 +575,10 @@
     });
   }
 
-  // resizes to the slide's real export resolution and re-encodes as JPEG before it ever touches storage
+  // caps the long edge at 2x the slide's export size (headroom for cover-fit and zoom) and re-encodes as JPEG 92%
+  // before it touches storage. Transparency is not kept: transparent areas are flattened onto white.
   function compressImageFile(file, maxDim, quality){
-    maxDim = maxDim || 1350; quality = quality != null ? quality : 0.82;
+    maxDim = maxDim || 2700; quality = quality != null ? quality : 0.92;
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(reader.error || new Error("Falha ao ler o arquivo"));
@@ -590,7 +591,10 @@
           const h = Math.max(1, Math.round(original.height * scale));
           const canvas = document.createElement("canvas");
           canvas.width = w; canvas.height = h;
-          canvas.getContext("2d").drawImage(original, 0, 0, w, h);
+          const cctx = canvas.getContext("2d");
+          cctx.fillStyle = "#ffffff"; cctx.fillRect(0, 0, w, h);
+          cctx.imageSmoothingEnabled = true; cctx.imageSmoothingQuality = "high";
+          cctx.drawImage(original, 0, 0, w, h);
           const dataUrl = canvas.toDataURL("image/jpeg", quality);
           const compressed = new Image();
           compressed.onload = () => resolve({ dataUrl, img: compressed });

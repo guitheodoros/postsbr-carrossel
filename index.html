@@ -12,7 +12,7 @@
   } catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,900;100,400&family=Instrument+Serif:ital@1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,500;87.5,900;100,400&family=Instrument+Serif:ital@1&display=swap">
 <style>
   :root{
     color-scheme: light dark;
@@ -388,6 +388,13 @@
             <span class="export-note" id="headlineSizeValue" style="min-width:34px;">84px</span>
             <button class="btn" id="resetHeadlineSize" type="button" title="Restaurar tamanho padrão" style="padding:6px 10px; font-size:11px;">padrão</button>
           </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+            <label for="headlineWeight" style="margin:0;">Peso do título</label>
+            <select id="headlineWeight" style="flex:1;">
+              <option value="900">900 · Black (padrão)</option>
+              <option value="500">500 · Medium</option>
+            </select>
+          </div>
         </div>
         <div class="field">
           <div class="label-row"><label for="bodyInput">Texto</label><span class="char-count" id="bodyCount"></span></div>
@@ -712,6 +719,7 @@
       headline: "",
       body: "",
       headlineSize: 84,
+      headlineWeight: 900,
       bodySize: 35,
       valign: "center",
       halign: "left",
@@ -766,7 +774,7 @@
       mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, eyebrowBg: !!s.eyebrowBg, eyebrowBgColor: s.eyebrowBgColor, headline: s.headline, body: s.body,
-        headlineSize: s.headlineSize, bodySize: s.bodySize,
+        headlineSize: s.headlineSize, headlineWeight: s.headlineWeight, bodySize: s.bodySize,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
         bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
           layout: s.bg.layout || "single",
@@ -1028,9 +1036,10 @@
 
     const headlineBudget = boxHeight*0.62 - eyebrowH;
     const rules = sizeRules(index, total);
+    const headlineWeight = String(s.headlineWeight === 500 ? 500 : 900);
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
-      weight:"900", family:"Roboto", stretch:"semi-condensed", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
+      weight:headlineWeight, family:"Roboto", stretch:"semi-condensed", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
       startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.05,
       maxLines: rules.headline.lines
     });
@@ -1094,7 +1103,7 @@
       y += gap - eyebrowH*0.3;
     }
     ctx.fillStyle = s.textColor;
-    drawLines(headlineFit.lines, "900 " + headlineFit.size + "px 'Roboto'", headlineFit.lineHeight, "semi-condensed");
+    drawLines(headlineFit.lines, headlineWeight + " " + headlineFit.size + "px 'Roboto'", headlineFit.lineHeight, "semi-condensed");
     if (s.body){
       y += gap;
       ctx.fillStyle = s.textColor;
@@ -1456,6 +1465,7 @@
     const bodySize = clampSize(s.bodySize, rules.body);
     $("headlineSize").value = headlineSize;
     $("headlineSizeValue").textContent = headlineSize + "px";
+    $("headlineWeight").value = s.headlineWeight === 500 ? "500" : "900";
     $("bodySize").value = bodySize;
     $("bodySizeValue").textContent = bodySize + "px";
     $("bgType").value = s.bg.type;
@@ -1528,6 +1538,10 @@
   bindField("headlineSize","input", e => {
     selectedSlide().headlineSize = Number(e.target.value);
     $("headlineSizeValue").textContent = e.target.value + "px";
+    scheduleRender();
+  });
+  bindField("headlineWeight","change", e => {
+    selectedSlide().headlineWeight = Number(e.target.value);
     scheduleRender();
   });
   bindField("bodySize","input", e => {
@@ -2184,6 +2198,7 @@
       document.fonts.load("500 16px 'IBM Plex Mono'");
       document.fonts.load("700 40px 'Geist'");
       document.fonts.load("900 semi-condensed 40px 'Roboto'");
+      document.fonts.load("500 semi-condensed 40px 'Roboto'");
       document.fonts.load("400 20px 'Roboto'");
       document.fonts.load("italic 400 30px 'Instrument Serif'");
       document.fonts.ready.then(() => { buildFilmstrip(); renderMain(); });

@@ -12,7 +12,22 @@
   } catch(e){}
 })();
 </script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@87.5,500;87.5,700;87.5,900;100,200;100,300;100,400&family=Instrument+Serif:ital@1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,900;1,9..144,500&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@700&family=Roboto:wdth,wght@100,200;100,300;100,400&family=Instrument+Serif:ital@1&display=swap">
+<!-- Roboto condensed (wdth 87.5) under its own family name so the canvas picks the weight without needing fontStretch (Safari) -->
+<style id="roboto-cond">
+  /* latin-ext */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 500; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3KUBHMdazTgWw.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+  /* latin */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 500; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3yUBHMdazQ.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+  /* latin-ext */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 700; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3KUBHMdazTgWw.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+  /* latin */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 700; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3yUBHMdazQ.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+  /* latin-ext */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 900; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3KUBHMdazTgWw.woff2) format('woff2'); unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+  /* latin */ @font-face { font-family: 'RobotoCond'; font-style: normal; font-weight: 900; font-stretch: 87.5%; font-display: swap; src: url(https://fonts.gstatic.com/s/roboto/v51/KFO7CnqEu92Fr1ME7kSn66aGLdTylScMa3yUBHMdazQ.woff2) format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+</style>
 <style>
   :root{
     color-scheme: light dark;
@@ -1049,7 +1064,7 @@
     const headlineWeight = String([500, 700].includes(s.headlineWeight) ? s.headlineWeight : 900);
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
-      weight:headlineWeight, family:"Roboto", stretch:"semi-condensed", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
+      weight:headlineWeight, family:"RobotoCond", stretch:"normal", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
       startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.05,
       maxLines: rules.headline.lines
     });
@@ -1120,7 +1135,7 @@
       y += gap - eyebrowH*0.3;
     }
     ctx.fillStyle = s.textColor;
-    drawLines(headlineFit.lines, headlineWeight + " " + headlineFit.size + "px 'Roboto'", headlineFit.lineHeight, "semi-condensed");
+    drawLines(headlineFit.lines, headlineWeight + " " + headlineFit.size + "px 'RobotoCond'", headlineFit.lineHeight, "normal");
     if (s.body){
       y += gap;
       ctx.fillStyle = s.textColor;
@@ -2227,9 +2242,9 @@
       document.fonts.load("400 20px 'IBM Plex Sans'");
       document.fonts.load("500 16px 'IBM Plex Mono'");
       document.fonts.load("700 40px 'Geist'");
-      document.fonts.load("900 semi-condensed 40px 'Roboto'");
-      document.fonts.load("700 semi-condensed 40px 'Roboto'");
-      document.fonts.load("500 semi-condensed 40px 'Roboto'");
+      document.fonts.load("900 40px 'RobotoCond'");
+      document.fonts.load("700 40px 'RobotoCond'");
+      document.fonts.load("500 40px 'RobotoCond'");
       document.fonts.load("400 20px 'Roboto'");
       document.fonts.load("300 20px 'Roboto'");
       document.fonts.load("200 20px 'Roboto'");

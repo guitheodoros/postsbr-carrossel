@@ -307,23 +307,6 @@
         <input type="color" id="accentInput" value="#ff4b2e">
       </div>
       <div class="field">
-        <label for="logoSelect">Logo</label>
-        <select id="logoSelect">
-          <option value="none">Nenhum</option>
-          <option value="auto" selected>Automático</option>
-          <option value="preto">SneakersBR — preto (fixo)</option>
-          <option value="branco">SneakersBR — branco (fixo)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="logoPosSel">Posição do logo</label>
-        <select id="logoPosSel">
-          <option value="left">Esquerda</option>
-          <option value="center">Centro</option>
-          <option value="right">Direita</option>
-        </select>
-      </div>
-      <div class="field">
         <label>&nbsp;</label>
         <div style="display:flex; gap:12px;">
           <span class="check"><input type="checkbox" id="showLogo" checked> exibir logo</span>
@@ -362,6 +345,11 @@
           <h3 id="editorTitle">Slide 1</h3>
           <div style="display:flex; align-items:center; gap:12px;">
             <span class="check"><input type="checkbox" id="slideShowLogo" checked> logo neste slide</span>
+            <select id="slideLogoColor" title="Cor do logo neste slide" style="width:auto;">
+              <option value="auto">Logo: automático</option>
+              <option value="preto">Logo: preto</option>
+              <option value="branco">Logo: branco</option>
+            </select>
             <span class="role-tag" id="roleTag">capa</span>
           </div>
         </div>
@@ -756,7 +744,7 @@
   const state = {
     format: "4:5",
     brand: { handle:"@suamarca", accent:"#ff4b2e", showHandle:true, showPageNum:true,
-      showLogo:true, logoPos:"left", logo:{ mode:"auto", imgs:{ preto:null, branco:null } } },
+      showLogo:true, logo:{ mode:"auto", imgs:{ preto:null, branco:null } } },
     selectedId: null,
     mediaPool: [], // { id, name, dataUrl, img } — imagens carregadas em lote, atribuídas por slide
     slides: [
@@ -791,14 +779,13 @@
       format: state.format,
       brand: { handle: state.brand.handle, accent: state.brand.accent,
         showHandle: state.brand.showHandle, showPageNum: state.brand.showPageNum,
-        showLogo: state.brand.showLogo, logoPos: state.brand.logoPos,
-        logoMode: state.brand.logo.mode },
+        showLogo: state.brand.showLogo },
       selectedId: state.selectedId,
       mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, eyebrowBg: !!s.eyebrowBg, eyebrowBgColor: s.eyebrowBgColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, headlineWeight: s.headlineWeight, bodySize: s.bodySize, bodyWeight: s.bodyWeight,
-        valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo,
+        valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo, logoColor: s.logoColor || "auto",
         bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
           layout: s.bg.layout || "single",
           cells: (s.bg.cells || []).map(c => ({ image: c.image, poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom, rot: c.rot || 0 })) }
@@ -1027,8 +1014,9 @@
     // logo (pinned to the top of every slide, text flows below it)
     let contentTop = boxTop;
     let logoImg = null;
-    if (brand.showLogo && s.showLogo !== false && brand.logo && brand.logo.mode !== "none"){
-      const variant = brand.logo.mode === "auto" ? (isDarkBg(s) ? "branco" : "preto") : brand.logo.mode;
+    if (brand.showLogo && s.showLogo !== false && brand.logo){
+      const logoColor = s.logoColor || "auto";
+      const variant = logoColor === "auto" ? (isDarkBg(s) ? "branco" : "preto") : logoColor;
       logoImg = brand.logo.imgs && brand.logo.imgs[variant];
     }
     if (logoImg && logoImg.complete && logoImg.naturalWidth){
@@ -1037,8 +1025,7 @@
       let logoW = Math.min(Math.round(W*0.1625), maxLogoW);
       let logoH = logoW/ratio;
       let logoX = boxLeft;
-      if (brand.logoPos === "center") logoX = boxLeft + (boxWidth-logoW)/2;
-      else if (brand.logoPos === "right") logoX = boxLeft+boxWidth-logoW;
+      if (s.halign === "center") logoX = boxLeft + (boxWidth-logoW)/2;
       ctx.drawImage(logoImg, logoX, boxTop, logoW, logoH);
       contentTop = boxTop + logoH + gap*2.1;
     }
@@ -1489,6 +1476,7 @@
     $("roleTag").textContent = roleLabel(i, state.slides.length);
     updateCharCounts();
     $("slideShowLogo").checked = s.showLogo !== false;
+    $("slideLogoColor").value = s.logoColor || "auto";
     $("valignSel").value = s.valign;
     $("halignSel").value = s.halign;
     $("eyebrowInput").value = s.eyebrow;
@@ -1554,6 +1542,7 @@
   function bindField(id, evt, handler){ $(id).addEventListener(evt, handler); }
 
   bindField("slideShowLogo","change", e => { selectedSlide().showLogo = e.target.checked; scheduleRender(); });
+  bindField("slideLogoColor","change", e => { selectedSlide().logoColor = e.target.value; scheduleRender(); });
   bindField("valignSel","change", e => { selectedSlide().valign = e.target.value; scheduleRender(); });
   bindField("halignSel","change", e => { selectedSlide().halign = e.target.value; scheduleRender(); });
   bindField("eyebrowInput","input", e => { selectedSlide().eyebrow = e.target.value; updateCharCounts(); scheduleRender(); });
@@ -1926,12 +1915,6 @@
   $("showHandle").addEventListener("change", e => { state.brand.showHandle = e.target.checked; scheduleRender(); });
   $("showPageNum").addEventListener("change", e => { state.brand.showPageNum = e.target.checked; scheduleRender(); });
   $("showLogo").addEventListener("change", e => { state.brand.showLogo = e.target.checked; scheduleRender(); });
-  $("logoPosSel").addEventListener("change", e => { state.brand.logoPos = e.target.value; scheduleRender(); });
-
-  $("logoSelect").addEventListener("change", e => {
-    state.brand.logo.mode = e.target.value;
-    scheduleRender(); scheduleSave();
-  });
 
   function preloadLogos(){
     ["preto","branco"].forEach(variant => {
@@ -2204,12 +2187,15 @@
   // ---- init ----
   function applyDraft(draft){
     state.format = draft.format === "1:1" ? "1:1" : "4:5";
-    const logoMode = draft.brand.logoMode || "auto";
-    state.brand = Object.assign(state.brand, draft.brand, {
-      logoPos: draft.brand.logoPos || "left"
-    });
-    state.brand.logo.mode = logoMode;
+    const oldLogoMode = draft.brand.logoMode || "auto";
+    state.brand = Object.assign(state.brand, draft.brand);
     state.slides = draft.slides;
+    // older drafts kept logo color/position per carousel: carry the color over to each slide
+    state.slides.forEach(sl => {
+      if (sl.logoColor) return;
+      if (oldLogoMode === "none") sl.showLogo = false;
+      sl.logoColor = oldLogoMode === "preto" || oldLogoMode === "branco" ? oldLogoMode : "auto";
+    });
     state.selectedId = state.slides.some(s => s.id === draft.selectedId)
       ? draft.selectedId : state.slides[0].id;
     state.mediaPool = draft.mediaPool || [];
@@ -2220,8 +2206,6 @@
     $("showHandle").checked = state.brand.showHandle;
     $("showPageNum").checked = state.brand.showPageNum;
     $("showLogo").checked = state.brand.showLogo;
-    $("logoPosSel").value = state.brand.logoPos;
-    $("logoSelect").value = state.brand.logo.mode;
     [...$("formatSeg").children].forEach(b => b.classList.toggle("active", b.getAttribute("data-format") === state.format));
     updateExportLabels();
     $("saveStatus").textContent = "rascunho restaurado";

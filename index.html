@@ -479,7 +479,7 @@
         </div>
         <div class="field" id="serverUrlField" style="display:none">
           <label for="serverUrlInput">Servidor de conversão (opcional)</label>
-          <input type="text" id="serverUrlInput" placeholder="Ex.: https://seu-servidor.up.railway.app" value="https://postsbr-video-converter-production.up.railway.app">
+          <input type="text" id="serverUrlInput" placeholder="Ex.: https://seu-servidor.up.railway.app">
           <span class="export-note">vazio = converte no navegador (mais lento)</span>
         </div>
         <div class="field" id="overlayField" style="display:none">
@@ -2232,6 +2232,8 @@
     preloadLogos();
     let rawServerUrl = null;
     try { rawServerUrl = localStorage.getItem(SERVER_URL_KEY); } catch(e){}
+    // Railway server is offline (trial ended): drop the old default saved by earlier visits
+    if (rawServerUrl && rawServerUrl.replace(/\/+$/, "") === "https://postsbr-video-converter-production.up.railway.app"){ rawServerUrl = ""; setServerUrl(""); }
     if (rawServerUrl != null) $("serverUrlInput").value = rawServerUrl;
     else setServerUrl($("serverUrlInput").value);
     const draft = await loadDraft();

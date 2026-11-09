@@ -110,6 +110,7 @@
   .field label, .field .field-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:600; }
   .field-row{ display:flex; gap:8px; align-items:center; }
   .check{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); }
+  .check-row{ display:flex; gap:4px 12px; flex-wrap:wrap; }
   .check input{ accent-color:var(--accent); cursor:pointer; }
   label.check, .field label.check{ cursor:pointer; text-transform:none; letter-spacing:0; font-size:12px; font-weight:400; }
 
@@ -186,7 +187,7 @@
     position:sticky; top:20px; }
   .phone-wrap{ position:relative; width:100%; }
   .phone{ width:100%; border-radius:26px; padding:9px; background:#0e0d10; box-shadow:var(--shadow); }
-  .phone canvas{ display:block; width:100%; height:auto; border-radius:17px; background:#111; touch-action:none; }
+  .phone canvas{ display:block; width:100%; height:auto; border-radius:17px; background:#111; touch-action:auto; }
   .crop-hint{ position:absolute; left:50%; bottom:34px; transform:translateX(-50%);
     background:rgba(0,0,0,.65); color:#fff; font-family:'IBM Plex Mono'; font-size:10.5px;
     padding:5px 10px; border-radius:12px; pointer-events:none; letter-spacing:.02em; white-space:nowrap; }
@@ -203,7 +204,9 @@
   .editor-col{ min-width:0; display:flex; flex-direction:column; gap:20px;
     background:var(--paper-2); border:1px solid var(--line); border-radius:9px; padding:22px 24px;
     position:sticky; top:20px; max-height:calc(100vh - 40px); overflow-y:auto; }
-  .editor-head{ display:flex; justify-content:space-between; align-items:baseline; }
+  .editor-head{ display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:8px 12px; }
+  .editor-head > div{ flex-wrap:wrap; min-width:0; }
+  .editor-head h3{ white-space:nowrap; }
   .editor-head h3{ font-family:'Fraunces'; font-size:17px; font-weight:600; margin:0; }
   .role-tag{ font-family:'IBM Plex Mono'; font-size:10.5px; text-transform:uppercase; letter-spacing:.08em;
     padding:3px 8px; border-radius:3px; background:var(--ink); color:var(--paper); }
@@ -260,8 +263,36 @@
   @media (max-width:820px){
     .thumb{ width:100px; }
     .workspace{ grid-template-columns:1fr; }
-    .preview-col{ max-width:none; position:static; }
+    /* the preview stays in view while the form scrolls under it, so edits are visible */
+    .preview-col{ max-width:none; position:sticky; top:0; z-index:6; background:var(--paper); padding:8px 0 6px; gap:8px; }
+    .phone-wrap{ width:min(100%, 30vh); min-width:190px; }
+    .phone{ padding:6px; border-radius:20px; }
+    .phone canvas{ border-radius:14px; }
     .editor-col{ position:static; max-height:none; overflow-y:visible; }
+  }
+
+  /* touch screens: every control reaches ~44px without changing how it looks */
+  @media (pointer:coarse){
+    label.check, .field label.check{ padding:12px 6px; min-height:44px; }
+    .check input[type="checkbox"]{ width:22px; height:22px; }
+    .theme-toggle{ position:relative; }
+    .theme-toggle::after{ content:""; position:absolute; inset:-14px -4px; }
+    .dots{ gap:12px; }
+    .dot{ position:relative; width:9px; height:9px; }
+    .dot.active{ width:22px; }
+    .dot::after{ content:""; position:absolute; inset:-18px -6px; }
+    .thumb{ width:116px; }
+    .thumb-controls button{ padding:12px 8px; font-size:14px; }
+    input[type="text"], input[type="color"], select, textarea{ min-height:44px; }
+    input[type="color"]{ min-width:44px; }
+    label.check{ white-space:nowrap; }
+    .media-pool-item{ width:64px; height:64px; }
+    .media-pool-item button{ opacity:1; width:28px; height:28px; line-height:26px; font-size:14px; top:0; right:0; }
+    /* arrows sit beside the dots instead of on top of the slide */
+    .phone-nav{ width:44px; height:44px; font-size:18px; top:auto; bottom:-46px; transform:none; }
+    .phone-nav.prev{ left:0; } .phone-nav.next{ right:0; }
+    .btn-link{ padding:12px 0; }
+    .seg button{ padding:12px 18px; }
   }
 </style>
 <script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
@@ -327,7 +358,7 @@
       </div>
       <div class="field">
         <span class="field-label" id="globalTogglesLabel">Em todos os slides</span>
-        <div style="display:flex; gap:12px;" role="group" aria-labelledby="globalTogglesLabel">
+        <div class="check-row" role="group" aria-labelledby="globalTogglesLabel">
           <label class="check"><input type="checkbox" id="showLogo" checked> exibir logo</label>
           <label class="check"><input type="checkbox" id="showHandle" checked> exibir @</label>
           <label class="check"><input type="checkbox" id="showPageNum" checked> numeração</label>
@@ -556,6 +587,7 @@
 
   const uid = () => Math.random().toString(36).slice(2,9);
   const STORAGE_KEY = "mesa-de-carrossel:draft:v1";
+  const MEDIA_KEY = STORAGE_KEY + ":media"; // image bank { poolId: dataUrl }, stored apart so typing never rewrites the photos
   const SERVER_URL_KEY = "mesa-de-carrossel:serverUrl";
   const THEME_KEY = "mesa-de-carrossel:theme";
   const MIN_SLIDES = 2, MAX_SLIDES = 20;
@@ -564,13 +596,28 @@
   // ---- IndexedDB key-value store (draft storage — much higher quota than localStorage) ----
   const IDB_NAME = "mesa-de-carrossel";
   const IDB_STORE = "kv";
+  let idbConn = null;
   function idbOpen(){
-    return new Promise((resolve, reject) => {
+    if (idbConn) return idbConn;
+    idbConn = new Promise((resolve, reject) => {
       if (!window.indexedDB) { reject(new Error("IndexedDB indisponível")); return; }
       const req = indexedDB.open(IDB_NAME, 1);
       req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
+    });
+    idbConn.catch(() => { idbConn = null; });
+    return idbConn;
+  }
+  // several keys in one transaction, so the draft and its images are written together or not at all
+  async function idbSetMany(entries){
+    const db = await idbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, "readwrite");
+      entries.forEach(([key, value]) => tx.objectStore(IDB_STORE).put(value, key));
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
   }
   async function idbGet(key){
@@ -606,30 +653,27 @@
   function compressImageFile(file, maxDim, quality){
     maxDim = maxDim || 2700; quality = quality != null ? quality : 0.92;
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onerror = () => reject(reader.error || new Error("Falha ao ler o arquivo"));
-      reader.onload = () => {
-        const original = new Image();
-        original.onerror = () => reject(new Error("Não foi possível ler a imagem"));
-        original.onload = () => {
-          const scale = Math.min(1, maxDim / Math.max(original.width, original.height));
-          const w = Math.max(1, Math.round(original.width * scale));
-          const h = Math.max(1, Math.round(original.height * scale));
-          const canvas = document.createElement("canvas");
-          canvas.width = w; canvas.height = h;
-          const cctx = canvas.getContext("2d");
-          cctx.fillStyle = "#ffffff"; cctx.fillRect(0, 0, w, h);
-          cctx.imageSmoothingEnabled = true; cctx.imageSmoothingQuality = "high";
-          cctx.drawImage(original, 0, 0, w, h);
-          const dataUrl = canvas.toDataURL("image/jpeg", quality);
-          const compressed = new Image();
-          compressed.onload = () => resolve({ dataUrl, img: compressed });
-          compressed.onerror = () => reject(new Error("Falha ao gerar a versão comprimida"));
-          compressed.src = dataUrl;
-        };
-        original.src = reader.result;
+      const objectUrl = URL.createObjectURL(file); // no base64 copy of the full-size original
+      const original = new Image();
+      original.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Não foi possível ler a imagem")); };
+      original.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(original.width, original.height));
+        const w = Math.max(1, Math.round(original.width * scale));
+        const h = Math.max(1, Math.round(original.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        const cctx = canvas.getContext("2d");
+        cctx.fillStyle = "#ffffff"; cctx.fillRect(0, 0, w, h);
+        cctx.imageSmoothingEnabled = true; cctx.imageSmoothingQuality = "high";
+        cctx.drawImage(original, 0, 0, w, h);
+        URL.revokeObjectURL(objectUrl);
+        const dataUrl = canvas.toDataURL("image/jpeg", quality);
+        const compressed = new Image();
+        compressed.onload = () => resolve({ dataUrl, img: compressed });
+        compressed.onerror = () => reject(new Error("Falha ao gerar a versão comprimida"));
+        compressed.src = dataUrl;
       };
-      reader.readAsDataURL(file);
+      original.src = objectUrl;
     });
   }
 
@@ -796,35 +840,65 @@
   const thumbCanvases = new Map();
 
   // ---- autosave (per-browser draft, localStorage) ----
+  // the bank's data URL for an id, or null when that image is no longer in the bank
+  function poolUrl(id){
+    const p = id ? state.mediaPool.find(x => x.id === id) : null;
+    return p ? p.dataUrl : null;
+  }
+  let mediaVersion = 1, savedMediaVersion = 0; // bumped whenever the image bank changes
+  function markMediaDirty(){ mediaVersion++; }
+
   function serializableState(){
     return {
+      mediaSplit: true,
       projectName: $("projectName").value,
       format: state.format,
       brand: { handle: state.brand.handle, accent: state.brand.accent,
         showHandle: state.brand.showHandle, showPageNum: state.brand.showPageNum,
         showLogo: state.brand.showLogo },
       selectedId: state.selectedId,
-      mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name, dataUrl: p.dataUrl })),
+      mediaPool: state.mediaPool.map(p => ({ id: p.id, name: p.name })),
       slides: state.slides.map(s => ({
         id: s.id, eyebrow: s.eyebrow, eyebrowColor: s.eyebrowColor, eyebrowBg: !!s.eyebrowBg, eyebrowBgColor: s.eyebrowBgColor, headline: s.headline, body: s.body,
         headlineSize: s.headlineSize, headlineWeight: s.headlineWeight, bodySize: s.bodySize, bodyWeight: s.bodyWeight,
         valign: s.valign, halign: s.halign, textColor: s.textColor, showLogo: s.showLogo, logoColor: s.logoColor || "auto",
-        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2, image: s.bg.image, imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
+        bg: { type: s.bg.type, color1: s.bg.color1, color2: s.bg.color2,
+          image: s.bg.image && poolUrl(s.bg.poolId) === s.bg.image ? null : s.bg.image,
+          imageFromPool: !!(s.bg.image && poolUrl(s.bg.poolId) === s.bg.image),
+          imageOverlay: s.bg.imageOverlay, cropX: s.bg.cropX, cropY: s.bg.cropY, zoom: s.bg.zoom, rot: s.bg.rot || 0, poolId: s.bg.poolId || null,
           layout: s.bg.layout || "single",
-          cells: (s.bg.cells || []).map(c => ({ image: c.image, poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom, rot: c.rot || 0 })) }
+          cells: (s.bg.cells || []).map(c => ({ image: c.image && poolUrl(c.poolId) === c.image ? null : c.image,
+            imageFromPool: !!(c.image && poolUrl(c.poolId) === c.image), poolId: c.poolId || null, cropX: c.cropX, cropY: c.cropY, zoom: c.zoom, rot: c.rot || 0 })) }
       }))
     };
   }
 
-  let saveTimer = null;
+  let saveTimer = null, discarding = false;
   function scheduleSave(){
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(saveDraft, 500);
+    saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 500);
   }
+  // don't lose the last half second of edits when the tab is closed or backgrounded
+  function flushSave(){
+    if (!saveTimer) return;
+    clearTimeout(saveTimer); saveTimer = null;
+    saveDraft();
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSave(); });
+  window.addEventListener("pagehide", flushSave);
 
   async function saveDraft(){
+    if (discarding) return;
     try {
-      await idbSet(STORAGE_KEY, serializableState());
+      const version = mediaVersion;
+      const entries = [[STORAGE_KEY, serializableState()]];
+      if (version !== savedMediaVersion){
+        const bank = {};
+        state.mediaPool.forEach(p => { bank[p.id] = p.dataUrl; });
+        entries.push([MEDIA_KEY, bank]);
+      }
+      await idbSetMany(entries);
+      savedMediaVersion = version;
       const now = new Date();
       const hh = String(now.getHours()).padStart(2,"0"), mm = String(now.getMinutes()).padStart(2,"0");
       $("saveStatus").setAttribute("role", "status");
@@ -857,19 +931,31 @@
     try { parsed = await idbGet(STORAGE_KEY); } catch(e){ parsed = null; }
     if (!parsed) parsed = migrateLegacyLocalStorageDraft();
     if (!parsed || !Array.isArray(parsed.slides) || parsed.slides.length === 0) return null;
+    let bank = {};
+    if (parsed.mediaSplit){
+      try { bank = (await idbGet(MEDIA_KEY)) || {}; } catch(e){ bank = {}; }
+    }
+    parsed._wasSplit = !!parsed.mediaSplit;
     parsed.mediaPool = (Array.isArray(parsed.mediaPool) ? parsed.mediaPool : []).map(p => {
+      const dataUrl = p.dataUrl || bank[p.id];
+      if (!dataUrl) return null;
       const img = new Image();
-      img.onload = () => scheduleRender();
-      img.src = p.dataUrl;
-      return { id: p.id, name: p.name, dataUrl: p.dataUrl, img };
-    });
+      img.onload = () => { scheduleRender(); buildMediaGallery(); };
+      img.src = dataUrl;
+      return { id: p.id, name: p.name, dataUrl, img };
+    }).filter(Boolean);
+    const urlOf = id => { const p = parsed.mediaPool.find(x => x.id === id); return p ? p.dataUrl : null; };
     let hadVideo = false;
     parsed.slides = parsed.slides.map(raw => {
       const s = slide(raw);
       s.bg = Object.assign({ type:"solid", color1:"#17161b", color2:"#ff4b2e", image:null, img:null, imageOverlay:40, cropX:0.5, cropY:0.5, zoom:1, rot:0,
         videoUrl:null, videoEl:null, videoName:null, poolId:null, layout:"single", cells:[], activeCell:0 }, raw.bg);
+      if (s.bg.imageFromPool) s.bg.image = urlOf(s.bg.poolId);
+      delete s.bg.imageFromPool;
       s.bg.cells = (Array.isArray(s.bg.cells) ? s.bg.cells : []).map(c => {
         const cell = Object.assign(newCell(), c, { img:null });
+        if (cell.imageFromPool) cell.image = urlOf(cell.poolId);
+        delete cell.imageFromPool;
         if (cell.image){
           const im = new Image();
           im.onload = () => scheduleRender();
@@ -899,7 +985,9 @@
   }
 
   async function clearDraft(){
-    try { await idbDelete(STORAGE_KEY); } catch(e){}
+    discarding = true;
+    clearTimeout(saveTimer); saveTimer = null;
+    try { await idbDelete(STORAGE_KEY); await idbDelete(MEDIA_KEY); } catch(e){}
   }
 
   function confirmDialog(message){
@@ -1608,6 +1696,7 @@
   function updateCropAffordance(s){
     const draggable = bgDraggable(s);
     mainCanvas.style.cursor = draggable ? "grab" : "default";
+    mainCanvas.style.touchAction = draggable ? "none" : "auto";
     $("cropHint").style.display = draggable ? "block" : "none";
   }
 
@@ -1836,6 +1925,15 @@
   }
   mainCanvas.addEventListener("pointerup", endCropDrag);
   mainCanvas.addEventListener("pointercancel", endCropDrag);
+  function makeThumb(item){
+    const im = item.img;
+    if (item.thumb || !im || !im.complete || !im.naturalWidth) return;
+    const k = Math.min(1, 160 / Math.max(im.naturalWidth, im.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(im.naturalWidth * k)); c.height = Math.max(1, Math.round(im.naturalHeight * k));
+    c.getContext("2d").drawImage(im, 0, 0, c.width, c.height);
+    item.thumb = c.toDataURL("image/jpeg", 0.7);
+  }
   function buildMediaGallery(){
     const el = $("mediaPool");
     if (!el) return;
@@ -1846,7 +1944,8 @@
       div.className = "media-pool-item" + (s.bg.type === "image" && mediaTarget(s).poolId === item.id ? " active" : "");
       div.title = item.name || "";
       const img = document.createElement("img");
-      img.src = item.dataUrl;
+      makeThumb(item);
+      img.src = item.thumb || item.dataUrl;
       img.alt = item.name || "";
       div.appendChild(img);
       div.addEventListener("click", () => applyPoolImageToSelectedSlide(item));
@@ -1872,6 +1971,7 @@
 
   function removePoolImage(id){
     state.mediaPool = state.mediaPool.filter(p => p.id !== id);
+    markMediaDirty();
     buildMediaGallery();
     scheduleSave();
   }
@@ -1891,6 +1991,7 @@
     }
     if (!results.length) return;
     state.mediaPool.push(...results);
+    markMediaDirty();
     if (!state.slides.includes(s)){ buildMediaGallery(); scheduleSave(); return; } // slide was deleted meanwhile
     if (isGrid(s)){
       // fill consecutive cells starting at the active one
@@ -2323,6 +2424,7 @@
     state.slides = newSlides;
     state.selectedId = newSlides.some(s => s.id === draft.selectedId) ? draft.selectedId : newSlides[0].id;
     state.mediaPool = draft.mediaPool || [];
+    if (draft._wasSplit) savedMediaVersion = mediaVersion; else markMediaDirty(); // old drafts get converted on the next save
 
     if (draft.projectName) $("projectName").value = draft.projectName;
     $("handleInput").value = state.brand.handle;

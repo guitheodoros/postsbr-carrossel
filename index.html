@@ -106,13 +106,11 @@
   }
   :root[data-theme="dark"] .theme-toggle .theme-thumb{ transform:translateX(20px); background:var(--accent); }
   :root[data-theme="light"] .theme-toggle .theme-thumb{ transform:translateX(0); background:var(--ink); }
-  .subtitle{ color:var(--ink-soft); font-size:13.5px; margin-top:5px; max-width:46ch; }
   .header-controls{ display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
   .new-carrossel-btn{ position:absolute; top:0; right:0; }
 
   .field{ display:flex; flex-direction:column; gap:5px; }
   .field label, .field .field-label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); font-weight:600; }
-  .field-row{ display:flex; gap:8px; align-items:center; }
   .check{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--ink-soft); }
   .check-row{ display:flex; gap:4px 12px; flex-wrap:wrap; }
   .check input{ accent-color:var(--accent); cursor:pointer; }
@@ -225,8 +223,6 @@
   .btn:hover:not(:disabled){ border-color:var(--ink-soft); }
   .btn.primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
   .btn.primary:hover:not(:disabled){ filter:brightness(1.05); }
-  .btn.btn-white{ background:#ffffff; color:#17161b; border-color:#ffffff; }
-  .btn.btn-white:hover:not(:disabled){ filter:brightness(0.95); }
   .btn:disabled{ opacity:.45; cursor:not-allowed; }
   .btn-link{ font:inherit; font-size:12px; font-weight:600; background:none; border:0; padding:2px 0; color:var(--ink); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
   .btn-link:hover:not(:disabled){ color:var(--accent-strong); }
@@ -305,9 +301,9 @@
     .seg button{ padding:12px 18px; }
   }
 </style>
-<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
-<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://unpkg.com/@ffmpeg/util@0.12.1/dist/umd/index.js" integrity="sha384-77TSno5UBOIFbP0dHjJN2umKfrf22jDQ8tKw2BfJqKvoJfUsWnmtW6a5LlkDVdNu" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js" integrity="sha384-HJcOheArWWImG8iIDY0pbuK4nyRXZYGkzfaCq+ghw2CcjBlDShKWGpC9sTL42Lcu" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha384-+mbV2IY1Zk/X1p/nWllGySJSUN8uMs+gUAN10Or95UBH0fpj6GfKgPmgC5EXieXG" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -517,7 +513,6 @@
         <div class="field" id="imageField" style="display:none">
           <div class="cell-picker" id="cellPicker"></div>
           <span class="field-label">Carregar imagens</span>
-          <input type="text" id="bgImageName" readonly placeholder="Nenhuma imagem" style="display:none">
           <label class="dropzone" id="bgDrop" for="bgImage">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
             <span><strong>Clique para enviar</strong> ou arraste e solte</span>
@@ -2310,14 +2305,37 @@
   // (classic-worker only), so the two are incompatible. A plain classic Worker built
   // from a blob of that same script (to dodge the cross-origin Worker() restriction)
   // works fine — the block below just speaks its {id,type,data} message format.
+  // The files the converter downloads at run time are checked against pinned SHA-384 hashes (the
+  // <script> tags above use the same protection via `integrity`): if the CDN ever served something
+  // different, the conversion is refused instead of running it.
+  const FFMPEG_BASE = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
+  const FFMPEG_FILES = {
+    worker: { url: "https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js", type: "text/javascript",
+      hash: "FbQ8Kru8R64sYInfholnDBqLYOCaBYZ4dig9JygFkoVZfRBndt7WQJo6CSCeono9" },
+    core: { url: FFMPEG_BASE + "/ffmpeg-core.js", type: "text/javascript",
+      hash: "c9jtXGMa7FHb4zjdEQbYHSk+IhD2qPKTKyyD05+FsJ4hTo1G67o9cgo7APw3U9Lv" },
+    wasm: { url: FFMPEG_BASE + "/ffmpeg-core.wasm", type: "application/wasm",
+      hash: "SnAthyn82idS4YdVo46XOl86g1sUylqtN6BEYmPDFqzVO3Z3O/Xj1tVlyFqgyW4K" }
+  };
+  async function fetchVerifiedBlobUrl(file){
+    const res = await fetch(file.url);
+    if (!res.ok) throw new Error("Não foi possível baixar o conversor de vídeo (erro " + res.status + ")");
+    const buf = await res.arrayBuffer();
+    const digest = new Uint8Array(await crypto.subtle.digest("SHA-384", buf));
+    if (btoa(String.fromCharCode(...digest)) !== file.hash){
+      throw new Error("O conversor de vídeo baixado não confere com o esperado — bloqueado por segurança");
+    }
+    return URL.createObjectURL(new Blob([buf], { type: file.type }));
+  }
+
   let ffmpegWorkerPromise = null;
   function getFFmpeg(){
     if (ffmpegWorkerPromise) return ffmpegWorkerPromise;
     ffmpegWorkerPromise = (async () => {
       if (!window.FFmpegUtil) throw new Error("Conversor de vídeo não carregou (sem conexão?)");
-      const { toBlobURL } = FFmpegUtil;
       setExportProgress("Carregando conversor de vídeo (só na primeira vez)…");
-      const workerBlobUrl = await toBlobURL("https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/umd/814.ffmpeg.js", "text/javascript");
+      const [workerBlobUrl, coreURL, wasmURL] = await Promise.all(
+        [FFMPEG_FILES.worker, FFMPEG_FILES.core, FFMPEG_FILES.wasm].map(fetchVerifiedBlobUrl));
       const worker = new Worker(workerBlobUrl);
       let msgId = 0;
       const pending = new Map();
@@ -2345,9 +2363,8 @@
           worker.postMessage({ id, type, data }, transfer || []);
         });
       }
-      const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
       try {
-        await send("LOAD", { coreURL: base + "/ffmpeg-core.js", wasmURL: base + "/ffmpeg-core.wasm" });
+        await send("LOAD", { coreURL, wasmURL });
       } catch(err){
         worker.terminate();
         throw err;

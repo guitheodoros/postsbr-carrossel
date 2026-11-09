@@ -1388,7 +1388,7 @@
   function swap(i,j){
     const arr = state.slides;
     [arr[i],arr[j]] = [arr[j],arr[i]];
-    buildFilmstrip(); renderMain(); scheduleSave();
+    buildFilmstrip(); syncEditor(); renderMain(); scheduleSave();
   }
 
   function duplicateSlide(id){
@@ -1428,6 +1428,7 @@
     }
     while (state.slides.length > n){
       const removed = state.slides.pop();
+      if (removed.bg.videoEl){ removed.bg.videoEl.pause(); removed.bg.videoEl.remove(); }
       if (state.selectedId === removed.id) state.selectedId = state.slides[state.slides.length-1].id;
     }
     buildFilmstrip(); syncEditor(); renderMain(); scheduleSave();
@@ -1801,6 +1802,7 @@
   async function addFilesToPool(fileList){
     const files = Array.from(fileList || []);
     if (!files.length) return;
+    const s = selectedSlide(); // the slide the user started on, not the one selected when compression ends
     const results = [];
     for (const file of files){
       try {
@@ -1812,7 +1814,7 @@
     }
     if (!results.length) return;
     state.mediaPool.push(...results);
-    const s = selectedSlide();
+    if (!state.slides.includes(s)){ buildMediaGallery(); scheduleSave(); return; } // slide was deleted meanwhile
     if (isGrid(s)){
       // fill consecutive cells starting at the active one
       ensureCells(s);
@@ -1827,8 +1829,9 @@
       s.bg.poolId = results[0].id;
     }
     scheduleRender();
+    redrawThumb(s);
     buildMediaGallery();
-    buildCellPicker(s);
+    if (s === selectedSlide()) buildCellPicker(s);
     scheduleSave();
   }
 
@@ -1882,7 +1885,19 @@
   bindField("serverUrlInput","input", e => setServerUrl(e.target.value));
 
   $("addSlide").addEventListener("click", addSlide);
-  $("slideCountSel").addEventListener("change", e => setSlideCount(Number(e.target.value)));
+  // a slide still holding the "novo slide" placeholder text on a plain background has nothing to lose
+  function isUntouchedSlide(s){
+    return !s.eyebrow && s.headline === "Novo título" && s.body === "Escreva o texto deste slide." && s.bg.type === "solid";
+  }
+  $("slideCountSel").addEventListener("change", async e => {
+    const n = Math.max(MIN_SLIDES, Math.min(MAX_SLIDES, Number(e.target.value)));
+    const doomed = state.slides.slice(n).filter(sl => !isUntouchedSlide(sl));
+    if (doomed.length){
+      const ok = await confirmDialog("Reduzir para " + n + " slides vai apagar " + (doomed.length === 1 ? "1 slide" : doomed.length + " slides") + " com texto ou imagem, do slide " + (n+1) + " em diante. Não dá para desfazer. Continuar?");
+      if (!ok){ $("slideCountSel").value = String(state.slides.length); return; }
+    }
+    setSlideCount(n);
+  });
   $("prevSlide").addEventListener("click", () => {
     const i = selectedIndex();
     selectSlide(state.slides[(i-1+state.slides.length)%state.slides.length].id);
@@ -2000,7 +2015,12 @@
         });
       }
       const base = "https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd";
-      await send("LOAD", { coreURL: base + "/ffmpeg-core.js", wasmURL: base + "/ffmpeg-core.wasm" });
+      try {
+        await send("LOAD", { coreURL: base + "/ffmpeg-core.js", wasmURL: base + "/ffmpeg-core.wasm" });
+      } catch(err){
+        worker.terminate();
+        throw err;
+      }
       return {
         exec: (args) => send("EXEC", { args, timeout: -1 }),
         writeFile: (path, data) => send("WRITE_FILE", { path, data }),
@@ -2008,6 +2028,8 @@
         deleteFile: (path) => send("DELETE_FILE", { path })
       };
     })();
+    // a failed load (offline, CDN hiccup) must not poison every later export until the page is reloaded
+    ffmpegWorkerPromise.catch(() => { ffmpegWorkerPromise = null; });
     return ffmpegWorkerPromise;
   }
 
@@ -2161,43 +2183,55 @@
     $("exportOne").disabled = true; $("exportAll").disabled = true;
     const zip = new JSZip();
     let ok = 0;
-    for (let i=0;i<state.slides.length;i++){
-      try {
-        setExportProgress("Exportando slide " + (i+1) + " de " + state.slides.length + "…");
-        const { filename, blob } = await exportSlideAt(i);
-        zip.file(filename, blob);
-        ok++;
-        await new Promise(r => setTimeout(r, 200));
-      } catch(err){
-        toastMsg("Falhou no slide " + (i+1) + ": " + (err && err.message ? err.message : "erro"));
-        break;
+    try {
+      for (let i=0;i<state.slides.length;i++){
+        try {
+          setExportProgress("Exportando slide " + (i+1) + " de " + state.slides.length + "…");
+          const { filename, blob } = await exportSlideAt(i);
+          zip.file(filename, blob);
+          ok++;
+          await new Promise(r => setTimeout(r, 200));
+        } catch(err){
+          toastMsg("Falhou no slide " + (i+1) + ": " + (err && err.message ? err.message : "erro"));
+          break;
+        }
       }
+      if (ok > 0){
+        const complete = ok === state.slides.length;
+        setExportProgress("Compactando arquivos…");
+        const zipBlob = await zip.generateAsync({ type: "blob" });
+        const zipName = slug($("projectName").value) + (complete ? "" : "-parcial") + ".zip";
+        downloadBlob(zipName, zipBlob);
+        toastMsg(complete
+          ? "Carrossel exportado (" + ok + " itens em " + zipName + ")"
+          : "Só " + ok + " de " + state.slides.length + " slides saíram — baixei o que deu certo em " + zipName);
+      }
+    } catch(err){
+      toastMsg("Não foi possível montar o zip: " + (err && err.message ? err.message : "erro"));
+    } finally {
+      setExportProgress("");
+      $("exportOne").disabled = false; $("exportAll").disabled = false;
     }
-    if (ok === state.slides.length){
-      setExportProgress("Compactando arquivos…");
-      const zipBlob = await zip.generateAsync({ type: "blob" });
-      const zipName = slug($("projectName").value) + ".zip";
-      downloadBlob(zipName, zipBlob);
-      toastMsg("Carrossel exportado (" + ok + " itens em " + zipName + ")");
-    }
-    setExportProgress("");
-    $("exportOne").disabled = false; $("exportAll").disabled = false;
   });
 
   // ---- init ----
   function applyDraft(draft){
-    state.format = draft.format === "1:1" ? "1:1" : "4:5";
-    const oldLogoMode = draft.brand.logoMode || "auto";
-    state.brand = Object.assign(state.brand, draft.brand);
-    state.slides = draft.slides;
+    const brandDraft = draft.brand && typeof draft.brand === "object" ? draft.brand : {};
+    const format = draft.format === "1:1" ? "1:1" : "4:5";
+    const oldLogoMode = brandDraft.logoMode || "auto";
+    const newBrand = Object.assign({}, state.brand, brandDraft);
+    const newSlides = draft.slides;
     // older drafts kept logo color/position per carousel: carry the color over to each slide
-    state.slides.forEach(sl => {
+    newSlides.forEach(sl => {
       if (sl.logoColor) return;
       if (oldLogoMode === "none") sl.showLogo = false;
       sl.logoColor = oldLogoMode === "preto" || oldLogoMode === "branco" ? oldLogoMode : "auto";
     });
-    state.selectedId = state.slides.some(s => s.id === draft.selectedId)
-      ? draft.selectedId : state.slides[0].id;
+    // nothing above touched the live state, so a draft that throws midway leaves the example intact
+    state.format = format;
+    state.brand = newBrand;
+    state.slides = newSlides;
+    state.selectedId = newSlides.some(s => s.id === draft.selectedId) ? draft.selectedId : newSlides[0].id;
     state.mediaPool = draft.mediaPool || [];
 
     if (draft.projectName) $("projectName").value = draft.projectName;
@@ -2220,8 +2254,13 @@
     if (rawServerUrl && rawServerUrl.replace(/\/+$/, "") === "https://postsbr-video-converter-production.up.railway.app"){ rawServerUrl = ""; setServerUrl(""); }
     if (rawServerUrl != null) $("serverUrlInput").value = rawServerUrl;
     else setServerUrl($("serverUrlInput").value);
-    const draft = await loadDraft();
-    if (draft) applyDraft(draft);
+    try {
+      const draft = await loadDraft();
+      if (draft) applyDraft(draft);
+    } catch(err){
+      console.error("rascunho inválido", err);
+      toastMsg("Não consegui restaurar o rascunho salvo — abri o exemplo");
+    }
 
     if (document.fonts && document.fonts.ready){
       document.fonts.load("700 40px 'Fraunces'");

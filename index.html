@@ -454,7 +454,7 @@
           <div class="label-row"><label for="headlineInput">Título</label><span class="char-count" id="headlineCount"></span></div>
           <textarea id="headlineInput" rows="2"></textarea>
           <div style="display:flex; align-items:center; gap:8px; margin-top:2px;">
-            <input type="range" id="headlineSize" aria-label="Tamanho do título" min="80" max="135" step="1" value="84" style="flex:1; min-width:40px;">
+            <input type="range" id="headlineSize" aria-label="Tamanho do título" min="76" max="135" step="1" value="84" style="flex:1; min-width:40px;">
             <span class="export-note" id="headlineSizeValue" style="min-width:34px;">84px</span>
             <select id="headlineWeight" title="Peso do título" aria-label="Peso do título" style="flex:0 1 160px; min-width:0; padding:6px 8px; font-size:12px;">
               <option value="900">900 · Black (padrão)</option>
@@ -1188,7 +1188,7 @@
     const headlineStartSize = Math.round(clampSize(s.headlineSize, rules.headline) * (W/1080));
     const headlineFit = wrapAndFit(ctx, s.headline, {
       weight:headlineWeight, family:"RobotoCond", stretch:"normal", maxWidth:boxWidth, maxHeight:Math.max(headlineBudget, W*0.08),
-      startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1.05,
+      startSize:headlineStartSize, minSize:Math.round(rules.headline.min * (W/1080)), lineHeightRatio:1,
       maxLines: rules.headline.lines
     });
     const headlineH = headlineFit.lines.length * headlineFit.lineHeight;
@@ -1615,8 +1615,8 @@
   // font-size range (px at 1080 wide), default and max lines per slide type.
   // min is also the floor the auto-fit may shrink to; max is the slider's upper end.
   const SIZE_RULES = {
-    cover:   { headline: { min:82, max:135, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:5 } },
-    content: { headline: { min:80, max:100, def:84, lines:2 }, body: { min:35, max:42, def:35, lines:5 } }
+    cover:   { headline: { min:80, max:135, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:5 } },
+    content: { headline: { min:76, max:100, def:84, lines:3 }, body: { min:35, max:42, def:35, lines:5 } }
   };
   function sizeRules(i, total){ return SIZE_RULES[(i === 0 || i === total-1) ? "cover" : "content"]; }
   const clampSize = (v, r) => Math.max(r.min, Math.min(r.max, v != null ? v : r.def));
